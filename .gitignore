@@ -26,9 +26,4 @@ todos/
 # Generated knowledge graph (regenerate with `graphify update .`)
 graphify-out/
 
-# OpenCode / Superpowers
-# .opencode/
-# AGENTS.md
-# docs/superpowers/
-# .graphifyignore
 backend/data/
