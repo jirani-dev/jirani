@@ -23,6 +23,12 @@ class BookFileStorage:
         (self.upload_dir / safe_name).write_bytes(file_bytes)
         return safe_name
 
+    def save_cover(self, uid: str, data: bytes, ext: str) -> str:
+        name = f"{uid}.{ext}"
+        self.cover_dir.mkdir(parents=True, exist_ok=True)
+        (self.cover_dir / name).write_bytes(data)
+        return name
+
     def delete(self, rel_path: str) -> None:
         try:
             target = self.resolve(rel_path)

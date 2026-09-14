@@ -10,6 +10,7 @@ from app.schemas.video_schema import VideoCreate, VideoView
 from app.services.media_errors import MediaNotFound
 from app.services.media_file_storage import MediaFileStorage
 from app.services.media_validator import ALLOWED_VIDEO_EXTENSIONS, validate_media
+from app.services.video_metadata_reader import VideoMetadataReader
 
 
 class VideoService:
@@ -18,6 +19,7 @@ class VideoService:
         self.video_repo = VideoRepo(db)
         self.tag_repo = TagRepo(db)
         self.storage = MediaFileStorage(settings.VIDEO_DIR)
+        self.metadata_reader = VideoMetadataReader()
 
     def list_videos(self) -> list[VideoView]:
         return [VideoView.model_validate(v) for v in self.video_repo.list_all()]
@@ -34,10 +36,12 @@ class VideoService:
         validate_media(filename, allowed=ALLOWED_VIDEO_EXTENSIONS)
         tags = self.tag_repo.get_or_create_by_names(tag_names)
         saved_path = self.storage.save(file_bytes, filename)
+        poster_name = self.metadata_reader.poster(Path(saved_path), settings.COVER_DIR)
         video = self.video_repo.create(
             VideoCreate(title=title, description=description, file_path=saved_path)
         )
         video.tags = list(tags)
+        video.poster_path = poster_name
         self.db.commit()
         self.db.refresh(video)
         return VideoView.model_validate(video)

@@ -1252,13 +1252,13 @@ git commit -m "feat: orphan tag and entity cleanup after book/video delete and u
 - `VideoService.upload`: after `MediaFileStorage.save`, call `poster(...)`; on a filename, set `poster_path` in the row. `VideoView.poster_url` is a computed field: `f"/static/covers/{poster_path}"` or `None` (same `computed_field` idiom as `BookRead.cover_url` — Task 5)
 - Model column: `poster_path: Mapped[str | None] = mapped_column(String(255), nullable=True)`
 
-- [ ] **Step 1: Red-first tests** (`test_video_poster.py`, new module → collection ERROR is the red):
+- [x] **Step 1: Red-first tests** (`test_video_poster.py`, new module → collection ERROR is the red):
   1. `ffmpeg` absent (`monkeypatch.setattr(shutil, "which", lambda _: None)`) → `None`, never raises
   2. Present + a fixture "ffmpeg" script in `tmp_path` that execs `cp <tiny-jpg> <dest-arg>` (a real tempfile JPEG: any 400-byte file will do — the function doesn't inspect bytes) → returns a filename, file exists in `dest_dir`
   3. Fixture ffmpeg `exit 1` → `None`
   4. Upload-flow probe (extend `test_video_api.py`): with a poster-fixture on the fake PATH, `POST /videos/upload` → `VideoView.poster_url == f"/static/covers/{name}"`
-- [ ] **Step 2: Verify red** — collection ERROR for the new service module; the upload probe 200s today with `poster_url` absent.
-- [ ] **Step 3: Migration** (hand-written, small):
+- [x] **Step 2: Verify red** — collection ERROR for the new service module; the upload probe 200s today with `poster_url` absent. *(Witnessed: ModuleNotFoundError + KeyError poster_url.)*
+- [x] **Step 3: Migration** (hand-written, small): *(applied to dev — alembic at `c5a1e8b4d9f2`.)*
 
 ```python
 def upgrade() -> None:
@@ -1269,7 +1269,7 @@ def downgrade() -> None:
 ```
 
   Round-trip on the scratch-DB harness (up/down/up), then apply to dev.
-- [ ] **Step 4: Implement** model → schema → service per Interfaces. Verify green; format/lint/type; commit:
+- [x] **Step 4: Implement** model → schema → service per Interfaces. Verify green; format/lint/type; commit: *(196→206 passed; mypy 0 from touched files.)*
 
 ```bash
 git add backend/app/services/video_metadata_reader.py backend/app/models/video.py backend/app/schemas/video_schema.py backend/app/services/video_service.py backend/migrations backend/app/tests/media/test_video_poster.py backend/app/tests/media/test_video_api.py
@@ -1318,13 +1318,13 @@ Note to the React track: the SPA should hide upload/PATCH/DELETE UI behind the d
 - `BookService.update_book(uid, metadata, *, cover: bytes | None = None, cover_filename: str | None = None) -> BookRead` — when `cover` is present: validate **first**; then `storage.save_cover(uid, cover, ext)` → `{uid}.{ext}` in `COVER_DIR` (`save_cover` added to `BookFileStorage`, returns the relative name); **delete the old cover file if one existed**; set `cover_path`. When absent: cover untouched. Nothing lands on disk before validation (Invariant Best-Practice: validate first, mutate second)
 - Router: `PUT /books/{uid}` becomes multipart (form fields stay `title, author, level, genre, language, tags`; plus optional `cover` `UploadFile`). Mapping: `InvalidImageError` → 400
 
-- [ ] **Step 1: Red-first probes** — all three must fail today (the endpoint has no cover field):
+- [x] **Step 1: Red-first probes** — all three must fail today (the endpoint has no cover field): *(witnessed: 4 failed — the existing PUT silently ignored the cover part; `assert 200 == 400` on the evil-magic probe)*
   1. Admin `PUT /books/{uid}` with a real small PNG (`b"\x89PNG\r\n\x1a\n" + 100 padding bytes`) as `cover` → 200, `cover_url == f"/static/covers/{uid}.png"`, old cover file (seed one) removed from disk
   2. `.exe` magic with a `.png` name → 400 `Invalid image file`; `COVER_DIR` unchanged
   3. `PUT` with no `cover` → 200, `cover_url` unchanged
-- [ ] **Step 2: Implement** validator → storage → service → router per Interfaces.
-- [ ] **Step 3: Verify green** — `cd backend && uv run pytest -v` — all pass.
-- [ ] **Step 4: Format, lint, type + commit**:
+- [x] **Step 2: Implement** validator → storage → service → router per Interfaces. *(PUT already existed at book_router.py:154 — modified, not created; validate-first honored; old cover deleted only after the new one is saved. webp magic hardened to the full RIFF…WEBP fourcc during review.)*
+- [x] **Step 3: Verify green** — `cd backend && uv run pytest -v` — all pass. *(201 passed.)*
+- [x] **Step 4: Format, lint, type + commit**:
 
 ```bash
 git add backend/app/services/image_validator.py backend/app/services/book_service.py backend/app/services/book_file_storage.py backend/app/api/book_router.py backend/app/tests/media/test_book_cover_replace.py
@@ -1359,15 +1359,15 @@ return Response(status_code=204, headers={
 
   (Resurrection of the endpoint deleted in Task 5 — now behind a real converter plus the same containment + auth the rest of the surface has.)
 
-- [ ] **Step 1: Red-first probes** (`test_book_read.py`; the route is missing today → 404 is the red):
+- [x] **Step 1: Red-first probes** (`test_book_read.py`; the route is missing today → 404 is the red): *(witnessed: 5 failed — `assert 404 == 204`; cache probe used a real pymupdf conversion, 52 KB PDF, one convert across two GETs)*
   1. Authed `GET /books/{uid}/read` on a PDF book → **204**, `X-Accel-Redirect == f"/media/books/{quote(uid)}.pdf"`, `Content-Type: application/pdf`, body empty
   2. EPUB book → 204, redirect `== f"/media/books/{quote(uid)}.read.pdf"`, **and the converted file exists** under the monkeypatched `UPLOAD_DIR`
   3. Converter failure (`monkeypatch` the converter to return `None`) → 404 detail `Book not readable`
   4. Second GET on the same EPUB → 204 and the converter **not called again** (spy/monkeypatch counts calls — the cache contract)
   5. Unauthenticated → 401
-- [ ] **Step 2: Implement** converter → service → router per Interfaces.
-- [ ] **Step 3: Verify green** — `cd backend && uv run pytest -v` — all pass.
-- [ ] **Step 4: Format, lint, type + commit**:
+- [x] **Step 2: Implement** converter → service → router per Interfaces. *(conversion cached on dest existence; `Book not readable` stays 404.)*
+- [x] **Step 3: Verify green** — `cd backend && uv run pytest -v` — all pass. *(206 passed.)*
+- [x] **Step 4: Format, lint, type + commit**:
 
 ```bash
 git add backend/app/services/epub_converter.py backend/app/services/book_service.py backend/app/api/book_router.py backend/app/tests/media/test_book_read.py

@@ -12,7 +12,9 @@ from app.services.book_errors import BookAlreadyExists, BookNotFound
 from app.services.book_file_storage import BookFileStorage
 from app.services.content_validator import ContentValidator
 from app.services.cover_generator import CoverGenerator
+from app.services.epub_converter import EpubConverter
 from app.services.epub_metadata_reader import EpubMetadataReader
+from app.services.image_validator import ImageValidator
 
 MEDIA_TYPES = {"pdf": "application/pdf", "epub": "application/epub+zip"}
 
@@ -29,6 +31,8 @@ class BookService:
         level_repo: LevelRepo,
         genre_repo: GenreRepo,
         tag_repo: TagRepo | None = None,
+        image_validator: ImageValidator | None = None,
+        epub_converter: EpubConverter | None = None,
     ) -> None:
         self.book_repo = book_repo
         self.validator = validator
@@ -40,6 +44,12 @@ class BookService:
         self.genre_repo = genre_repo
         self.tag_repo = (
             tag_repo if tag_repo is not None else TagRepo(self.book_repo.db_session)
+        )
+        self.image_validator = (
+            image_validator if image_validator is not None else ImageValidator()
+        )
+        self.epub_converter = (
+            epub_converter if epub_converter is not None else EpubConverter()
         )
 
     def get_book_by_uid(self, book_uid: str) -> BookRead | None:
@@ -69,16 +79,42 @@ class BookService:
             )
         return media_path, media_type
 
+    def read_book(self, book_uid: str) -> tuple[Path, str]:
+        book = self.book_repo.get_book_by_uid(book_uid)
+        if not book:
+            raise BookNotFound(f"Book with UID {book_uid} does not exist")
+        media_path = self.storage.resolve(book.file_path)
+        if media_path.suffix.lstrip(".").lower() == "pdf":
+            return media_path, "application/pdf"
+        dest_dir = self.storage.upload_dir
+        dest = dest_dir / f"{media_path.stem}.read.pdf"
+        if not dest.is_file():
+            converted = self.epub_converter.convert(media_path, dest_dir)
+            if converted is None:
+                raise BookNotFound("Book not readable")
+        return dest, "application/pdf"
+
     def get_book_file(self, book_uid: str) -> Path:
         book = self.book_repo.get_book_by_uid(book_uid)
         if not book:
             raise BookNotFound(f"Book with UID {book_uid} does not exist")
         return self.storage.resolve(book.file_path)
 
-    def update_book(self, book_uid: str, data: BookUpdate) -> BookRead:
+    def update_book(
+        self,
+        book_uid: str,
+        data: BookUpdate,
+        *,
+        cover: bytes | None = None,
+        cover_filename: str | None = None,
+    ) -> BookRead:
         book = self.book_repo.get_book_by_uid(book_uid)
         if not book:
             raise BookNotFound(f"Book with UID {book_uid} does not exist")
+
+        ext: str | None = None
+        if cover is not None:
+            ext = self.image_validator.validate(cover, cover_filename or "")
 
         old_author_name = book.author.name if book.author else None
         old_level_name = book.level.name if book.level else None
@@ -126,6 +162,15 @@ class BookService:
             self.genre_repo.delete_orphans()
         if data.tags is not None:
             self.tag_repo.delete_orphans()
+
+        if cover is not None and ext is not None:
+            old_cover = book.cover_path
+            new_cover = self.storage.save_cover(book.uid, cover, ext)
+            if old_cover:
+                self.storage.delete_cover(old_cover)
+            updated.cover_path = new_cover
+            self.book_repo.db_session.commit()
+            self.book_repo.db_session.refresh(updated)
 
         return BookRead.model_validate(updated)
 

@@ -20,3 +20,7 @@ class BookAlreadyExists(BookError):
 
 class CoverGenerationFailed(BookError):
     default_detail = "Cover generation failed"
+
+
+class InvalidImageError(BookError):
+    default_detail = "Invalid image file"

@@ -17,6 +17,7 @@ class Video(TimestampMixin, Base):
     title: Mapped[str] = mapped_column(String, nullable=False)
     description: Mapped[str | None] = mapped_column(String, nullable=True)
     file_path: Mapped[str] = mapped_column(String, nullable=False)
+    poster_path: Mapped[str | None] = mapped_column(String(255), nullable=True)
     tags: Mapped[list["Tag"]] = relationship(
         "Tag", secondary="video_tags", back_populates="videos"
     )

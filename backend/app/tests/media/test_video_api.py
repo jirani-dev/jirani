@@ -1,4 +1,6 @@
 import mimetypes
+import os
+import re
 from urllib.parse import quote
 
 import pytest
@@ -77,6 +79,36 @@ def test_upload_happy(db, client, monkeypatch, tmp_path, auth):
     db.expire_all()
     row = db.query(Video).filter(Video.id == body["id"]).first()
     assert row is not None
+
+
+def test_upload_attaches_poster_url(db, client, monkeypatch, tmp_path, auth):
+    _patch_video_dir(monkeypatch, tmp_path)
+    covers_dir = tmp_path / "covers"
+    covers_dir.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(settings, "COVER_DIR", covers_dir)
+    fake_jpg = tmp_path / "fake.jpg"
+    fake_jpg_bytes = b"\xff\xd8\xff\xe0" + b"\x00" * 400
+    fake_jpg.write_bytes(fake_jpg_bytes)
+    ffmpeg = tmp_path / "ffmpeg"
+    ffmpeg.write_text(f'#!/bin/sh\nfor last do :; done\ncp "{fake_jpg}" "$last"\n')
+    ffmpeg.chmod(0o755)
+    monkeypatch.setenv("PATH", str(tmp_path) + os.pathsep + os.environ["PATH"])
+    response = client.post(
+        "/videos/upload",
+        files={
+            "file": ("clip.mp4", b"\x00\x00\x00\x18ftypmp42 mock bytes", "video/mp4")
+        },
+        data={"title": "Intro"},
+        headers=auth,
+    )
+    assert response.status_code == 200
+    body = response.json()
+    name = body["poster_url"].rsplit("/", 1)[1]
+    assert body["poster_url"] == f"/static/covers/{name}"
+    assert re.fullmatch(r"[0-9a-f-]{36}\.jpg", name)
+    poster = covers_dir / name
+    assert poster.is_file()
+    assert poster.read_bytes() == fake_jpg_bytes
 
 
 def test_upload_missing_title_returns_422(client, monkeypatch, tmp_path, auth):

@@ -23,7 +23,12 @@ from app.repositories.genre_repo import GenreRepo
 from app.repositories.level_repo import LevelRepo
 from app.schemas import BookUpload, TagCreate
 from app.schemas.book_schema import BookRead, BookSearchCriteria, BookUpdate, Page
-from app.services.book_errors import BookAlreadyExists, BookNotFound, InvalidBookFile
+from app.services.book_errors import (
+    BookAlreadyExists,
+    BookNotFound,
+    InvalidBookFile,
+    InvalidImageError,
+)
 from app.services.book_file_storage import BookFileStorage
 from app.services.book_service import BookService
 from app.services.content_validator import ContentValidator
@@ -137,6 +142,28 @@ def stream_book(
     )
 
 
+@router.get("/{book_uid}/read")
+def read_book(
+    book_uid: str,
+    svc: BookService = Depends(get_book_service),
+    user: Account = Depends(
+        RoleChecker([RoleEnum.admin, RoleEnum.teacher, RoleEnum.student])
+    ),
+) -> Response:
+    try:
+        media_path, _media_type = svc.read_book(book_uid)
+    except BookNotFound as exc:
+        raise HTTPException(status_code=404, detail=exc.detail) from exc
+    return Response(
+        status_code=204,
+        headers={
+            "X-Accel-Redirect": f"/media/books/{quote(media_path.name)}",
+            "Content-Type": "application/pdf",
+            "Accept-Ranges": "bytes",
+        },
+    )
+
+
 @router.get("/{book_uid}", response_model=BookRead)
 def get_book_details(
     book_uid: str,
@@ -152,7 +179,7 @@ def get_book_details(
 
 
 @router.put("/{book_uid}", response_model=BookRead)
-def update_book(
+async def update_book(
     book_uid: str,
     title: str | None = Form(None),
     author: str | None = Form(None),
@@ -160,6 +187,7 @@ def update_book(
     genre: str | None = Form(None),
     language: str | None = Form(None),
     tags: str | None = Form(None),
+    cover: UploadFile | None = File(None),
     svc: BookService = Depends(get_book_service),
     user: Account = Depends(RoleChecker([RoleEnum.admin, RoleEnum.teacher])),
 ) -> BookRead:
@@ -177,9 +205,17 @@ def update_book(
             language=language,
             tags=tag_list,
         )
-        return svc.update_book(book_uid, metadata)
+        cover_bytes = await cover.read() if cover is not None else None
+        return svc.update_book(
+            book_uid,
+            metadata,
+            cover=cover_bytes,
+            cover_filename=cover.filename if cover is not None else None,
+        )
     except BookNotFound as exc:
         raise HTTPException(status_code=404, detail="Book not found") from exc
+    except InvalidImageError as exc:
+        raise HTTPException(status_code=400, detail="Invalid image file") from exc
     except (IntegrityError, ValueError) as exc:
         raise HTTPException(status_code=400, detail="Invalid book data") from exc
 
