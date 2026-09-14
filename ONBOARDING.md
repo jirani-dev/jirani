@@ -5,41 +5,49 @@ teaches you the setup and the rules of working alongside it. For backend
 concepts themselves, read `docs/team/onboarding.md` next. `AGENTS.md` is the
 binding ruleset — this file is the guided tour, it never overrides it.
 
-## 1. One-time setup
+## 1. One-time setup (this section owns setup — nothing else repeats it)
+
+Tools: Python via `uv`, Docker (daemon), `node`, `graphify`, `opencode`, `gh`.
 
 ```bash
-# tools needed: python via uv, docker (daemon), node, graphify, opencode
-cd backend && uv sync        # creates backend/.venv (VS Code auto-discovers it)
-docker compose up -d db      # development Postgres
-uvx pre-commit install       # hooks run ruff + hygiene on every commit
+cd backend && uv sync                              # creates backend/.venv (VS Code auto-discovers it)
+cd ..
+docker compose up -d db                            # development Postgres
+uv tool install pre-commit && pre-commit install   # installs the pre-commit AND commit-msg hooks
+graphify update .                                  # builds graphify-out/ (gitignored — every clone generates its own)
 ```
 
 Install opencode: `npm i -g opencode-ai` (or see opencode.ai). Launch it in
 the repo root — it picks up `.opencode/opencode.jsonc` automatically.
 
+Why `uv tool install` and not `uvx`: the hook script pre-commit writes records
+the path of the Python that installed it. Under `uvx` that is an ephemeral
+cache environment, and a `uv cache clean` leaves you with a dead hook.
+
 Cross-machine notes: works on macOS, Linux (WSL), and Windows. Tests need a
 running Docker daemon (testcontainers starts its own Postgres — you never
-create a database by hand).
+create a database by hand). Machine-specific opencode overrides go in
+`~/.config/opencode/opencode.json`, never in the shared project file.
 
 ## 2. What's in `.opencode/`
 
 | Path | What it is |
 |---|---|
-| `opencode.jsonc` | Shared config: plugins, MCP servers, and the **permission block** that enforces what the agent may not touch (app source, DB schema, destructive git ops) |
-| `agent/review.md` | The one review gate — runs the DoD commands (ruff, mypy, pytest) AND audits the diff against the six invariants from AGENTS.md, one combined verdict. Used by `/done` and before claiming anything works |
-| `commands/done.md` | `/done` — one gate: invariant audit + DoD verification together |
-| `plugins/graphify.js` | The knowledge-graph plugin |
+| `opencode.jsonc` | Shared config: plugins (graphify, superpowers — pinned), MCP servers, and the **permission block**. The agent edits `backend/app/**` with a confirmation prompt on every edit; dependencies, packaging, schema, and destructive git operations are denied or ask |
+| `agent/review.md` | The one review gate — runs the DoD check commands (from `AGENTS.md`) AND audits the diff against the six invariants, one combined verdict. Used by `/done` and before claiming anything works |
+| `commands/done.md` | `/done` — dispatches the review gate on demand |
+| `plugins/graphify.js` | Prints a one-time reminder to query the knowledge graph before grepping raw files |
 
 ## 3. Graphify — query the map before reading code
 
-The repo carries a precomputed knowledge graph in `graphify-out/` (god nodes,
-cross-file relationships). The rule is binding in `AGENTS.md`:
+`graphify-out/` is **generated, not shipped**: it is gitignored, so `graphify
+update .` in §1 is what creates it, and you re-run that after code changes
+(local AST only, no API cost). The rule is binding in `AGENTS.md`:
 
 ```bash
-graphify query "how does audio upload validation work"   # scoped subgraph first
-graphify path "audio_router" "MediaFileStorage"          # relationships
+graphify query "how does book upload validation work"    # scoped subgraph first
+graphify path "book_router" "BookFileStorage"            # relationships
 graphify explain "X-Accel"                               # focused concepts
-graphify update .                                        # after code changes (local, no API cost)
 ```
 
 Read source files last, not first.
@@ -48,18 +56,29 @@ Read source files last, not first.
 
 `AGENTS.md` carries the six binding invariants (layering, error mapping,
 no CWD-relative paths, SQLAlchemy 2.0 style, tests on PostgreSQL, naming) and
-the Definition of Done commands. There is **no mandated workflow** — work how
-you like. A change is done when the `review` agent passes it locally
-(`@review …` or `/done`) and CI is green: the `ai-review` check audits every
-PR diff against the invariants and blocks merge on new violations; `quality`
-runs the DoD.
+the Definition of Done. Some of them are enforced by tooling now, not prose:
+ruff's `N801` is Invariant 6; the known debt is listed both in the AGENTS.md
+table and in `[tool.ruff.lint.per-file-ignores]`; the commit format is a
+commit-msg hook; merging into `master`/`refactor` requires green checks and
+one approval (`.github/rulesets/protected-branches.json`).
+
+There is **no mandated workflow** — work how you like. A change is done when
+the `review` agent passes it locally (`@review …` or `/done`) and CI is green.
 
 ## 5. How work flows
 
-1. **Build** — however you like. New model? Export it from
-   `models/__init__.py` or Alembic will generate a `drop_table` for it.
-2. **PR** — three checks run: `quality` (ruff + mypy + pytest), `docker-build`,
-   `ai-review` (see `CONTRIBUTING.md`). Human approval merges.
+1. **Start** — `git pull --ff-only` on `refactor` (the base until the media
+   plan's Part G lands; `master` after), branch off it, run the DoD once
+   before changing anything so you know the tree was green when you started.
+2. **Build** — however you like, with the agent or without. New model?
+   Export it from `models/__init__.py` or Alembic will generate a
+   `drop_table` for it. The agent may edit `backend/app/**`; you confirm each
+   edit in the TUI.
+3. **Gate** — `@review <what you changed>`; fix what it blocks; re-run.
+4. **Commit** — the commit-msg hook enforces the format in
+   `CONTRIBUTING.md`.
+5. **PR** — three checks run (`quality`, `docker-build`, `ai-review`); the
+   ruleset makes them required. One human approval merges.
 
 ### Example — one full cycle
 
@@ -75,32 +94,16 @@ runs the DoD.
 #     move the rule into BookService."
 #    re-run @review after fixing
 
-# 4. commit with the repo style
-git commit -m "feat: overdue flag on book"        # good — says what changed
-git commit -m "update stuff"                      # bad — says nothing
+# 4. commit — the hook rejects anything off-format
+git commit -m "feat(book): overdue flag"          # good — type, scope, what changed
+git commit -m "update stuff"                      # rejected by commit-msg-type
 
 # 5. push, open the PR, watch the three checks, request a human review
 ```
 
-Commit messages follow one rule: a future teammate should guess the diff
-from the message alone (`feat:`, `fix:`, `test:`, `refactor:`, `chore:`,
-`ci:`, `docs:`).
+## 6. Definition of Done
 
-Branches: `master` is the mainline and hub (it carries the agent config and
-docs). `refactor` is the active development line until the media refactor
-completes. Branch names: `feature/*`, `fix/*`, `tooling/*`.
-
-## 6. Definition of Done (run locally before pushing)
-
-From `backend/`, always with `uv run`:
-
-```bash
-uv run ruff format .
-uv run ruff check . --fix --ignore B008   # B008 is FastAPI's Depends() idiom
-uv run mypy <your changed files> --strict
-uv run pytest -v
-```
-
-`pre-commit` runs the fast subset on every commit; CI runs the full set on
-every PR. Something failing that you don't understand? Ask in the PR — a
-documented question beats a silent guess.
+Owned by `AGENTS.md` § Build & Test Commands (dev variant while you work,
+check variant is what the reviewer and CI run). Run it from `backend/`,
+always with `uv run`. Something failing that you don't understand? Ask in
+the PR — a documented question beats a silent guess.

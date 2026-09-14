@@ -5,7 +5,8 @@
   "$schema": "https://opencode.ai/config.json",
   "plugin": [
     ".opencode/plugins/graphify.js",
-    "superpowers@git+https://github.com/obra/superpowers.git"
+    // Pinned to superpowers 6.0.3. Bump deliberately, not on every restart.
+    "superpowers@git+https://github.com/obra/superpowers.git#896224c4b1879920ab573417e68fd51d2ccc9072"
   ],
   "mcp": {
     "context7": {
@@ -17,16 +18,16 @@
       "url": "https://mcp.grep.app"
     }
   },
-  // Enforces the advisory operating mode declared in AGENTS.md.
+  // Enforces the operating mode declared in AGENTS.md.
   // Prose in AGENTS.md is a request; this block is the actual boundary.
   // NOTE: within each object the LAST matching rule wins — broad patterns
   // first, narrow exceptions after.
   "permission": {
     "edit": {
       "*": "allow",
-      // Application source and infrastructure — the agent advises, you implement.
+      // Application source — the agent edits, you confirm each edit in the TUI.
       "backend/app/**": "ask",
-      "backend/app/tests/**": "ask",
+      // Dependencies, packaging, schema — human hands only. The agent proposes the diff in chat.
       "backend/pyproject.toml": "deny",
       "backend/uv.lock": "deny",
       "backend/Dockerfile": "deny",
@@ -42,10 +43,14 @@
       "git push*": "ask",
       "git reset*": "ask",
       "git checkout*": "ask",
+      "git switch*": "ask",
+      "git rebase*": "ask",
+      "git merge*": "ask",
       "git rm*": "ask",
       "rm *": "ask",
       "docker compose down*": "ask",
       "psql*": "ask",
+      // The only route to a dependency change — uv.lock is generated, pyproject is never hand-edited by the agent.
       "uv add*": "ask",
       "uv remove*": "ask"
     }

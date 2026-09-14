@@ -1,3 +1,5 @@
+# Executable mirror of AGENTS.md § Build & Test Commands (check variant), scoped to
+# changed Python files. Lint/format/type config lives in backend/pyproject.toml.
 name: ci
 
 on:
@@ -54,7 +56,7 @@ jobs:
       - name: Lint (changed files)
         if: steps.py.outputs.files != ''
         working-directory: backend
-        run: uv run ruff check ${{ steps.py.outputs.files }} --ignore B008
+        run: uv run ruff check ${{ steps.py.outputs.files }}
 
       - name: Type check (changed files)
         if: steps.py.outputs.files != ''
@@ -81,7 +83,7 @@ jobs:
 
       - name: Tests (testcontainers Postgres)
         working-directory: backend
-        run: uv run pytest -v
+        run: uv run pytest
 
   docker-build:
     runs-on: ubuntu-latest

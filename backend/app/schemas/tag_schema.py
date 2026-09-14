@@ -29,10 +29,11 @@ class TagCreate(TagBase):
         if len(v) < 1 or len(v) > 50:
             raise ValueError("Tag name must be between 1 and 50 characters")
 
-        # Check for invalid characters (allow letters, numbers, spaces, hyphens, underscores)
+        # Invalid characters: letters, numbers, spaces, hyphens, underscores
         if not re.match(r"^[\w\s-]+$", v):
             raise ValueError(
-                "Tag name can only contain letters, numbers, spaces, hyphens, and underscores"
+                "Tag name can only contain letters, numbers, "
+                "spaces, hyphens, and underscores"
             )
 
         return v
