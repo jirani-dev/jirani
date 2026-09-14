@@ -115,7 +115,7 @@ def stream_video(
     return Response(
         status_code=204,
         headers={
-            "X-Accel-Redirect": f"/media/vids/{quote(media_path.name)}",
+            "X-Accel-Redirect": f"/media/videos/{quote(media_path.name)}",
             "Content-Type": media_type,
             "Accept-Ranges": "bytes",
         },

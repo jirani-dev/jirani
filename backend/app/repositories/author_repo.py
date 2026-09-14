@@ -1,4 +1,4 @@
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.models.author import Author
@@ -7,6 +7,16 @@ from app.models.author import Author
 class AuthorRepo:
     def __init__(self, db: Session) -> None:
         self.db = db
+
+    def delete_orphans(self) -> int:
+        orphan_ids = list(
+            self.db.scalars(select(Author.id).where(~Author.books.any())).all()
+        )
+        if not orphan_ids:
+            return 0
+        self.db.execute(delete(Author).where(Author.id.in_(orphan_ids)))
+        self.db.commit()
+        return len(orphan_ids)
 
     def get_by_name(self, name: str) -> Author | None:
         # case-insensitive match, stored case returned; None when absent.

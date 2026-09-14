@@ -1155,9 +1155,9 @@ Part G runs **after** Task 10 (the anchor contract in the React annex). Every ta
 
 **Interfaces:** the stored `file_path` values live in `video` rows; legacy forms are absolute (`/app/uploads/vids/…` in-container) or relative (`uploads/vids/…`) — both contain the substring `uploads/vids/`, so one `replace()` covers both. **Files must move on disk too**, not just strings: the operator step below is not optional.
 
-- [ ] **Step 1: Operators' file move, done before any migration on the dev DB** — `docker compose down` → rename on the host volume: `mv uploads/vids uploads/videos` (if it doesn't exist yet, `mkdir -p uploads/videos` and stop — nothing to move) → `docker compose up -d`
-- [ ] **Step 2: Red-first probes** — flip the stream assertions: `X-Accel-Redirect == f"/media/videos/{quote(filename)}"` and `test_media_stream.py`'s rows to `/media/videos/...`. Run `cd backend && uv run pytest app/tests/media/test_video_api.py app/tests/media/test_video_repo.py app/tests/media/test_media_stream.py -v` — expected red: the code still emits `/media/vids/`. Everything else green.
-- [ ] **Step 3: The migration** (full code — data-touching, no learner delegation):
+- [x] **Step 1: Operators' file move, done before any migration on the dev DB** — dirs checked 2026-09-14: `uploads/vids` + `uploads/audio` exist and are EMPTY; `uploads/videos` created, nothing to move.
+- [x] **Step 2: Red-first probes** — flip the stream assertions: `X-Accel-Redirect == f"/media/videos/{quote(filename)}"` and `test_media_stream.py`'s rows to `/media/videos/...`. Run `cd backend && uv run pytest app/tests/media/test_video_api.py app/tests/media/test_video_repo.py app/tests/media/test_media_stream.py -v` — expected red: the code still emits `/media/vids/`. Everything else green. *(Witnessed: 5 failed / 32 passed, all `'/media/vids/...' != '/media/videos/...'` — green after the config/kind change.)*
+- [x] ~~**Step 3: The migration**~~ — **SKIPPED (user 2026-09-14, "remove all noise"):** the data migration would rewrite zero rows — `SELECT count(*) FROM video` = 0 on the only DB that matters (one-time device deployment, fresh DBs get the new path from config). Decision recorded here; `down_revision` would have been `e7c4b9f2a831`.
 
 ```python
 """video file paths: uploads/vids -> uploads/videos
@@ -1187,10 +1187,10 @@ def downgrade() -> None:
     )
 ```
 
-- [ ] **Step 4: `config.py` + `video_service.py`** per Interfaces. Note the mkdir lines in `main.py` read `settings.VIDEO_DIR` — no edit needed there. Verify green — same command as Step 2, all pass now.
-- [ ] **Step 5: Migration round-trip on a scratch DB** — same pattern as Task 5f step 2 (`jirani_migtest`-style DB): `upgrade head` → `downgrade -1` → `upgrade head`, all three succeed. Then apply to dev: `cd backend && uv run alembic upgrade head`.
-- [ ] **Step 6: Sweeps** — `grep -rn "uploads/vids" backend/app/ --include='*.py'` → zero matches (the CWD-relative literal dies here for video; audio's sites are out of scope and may still match — verify none of the matches are in this task's touched files). `grep -rn "/media/vids/" backend/ nginx/` → only history/comments if any, no live code.
-- [ ] **Step 7: Format, lint, type + commit** — same shape as the main pass (ruff format/check `--ignore B008`, mypy on the touched files, full `uv run pytest -v` green), then:
+- [x] **Step 4: `config.py` + `video_service.py`** per Interfaces. Note the mkdir lines in `main.py` read `settings.VIDEO_DIR` — no edit needed there. Verify green — same command as Step 2, all pass now. *(Green: 37 passed + full suite 180. Note: the X-Accel kind lives in `video_router.py:118`, not video_service — Task 8's fused router.)*
+- [x] ~~**Step 5: Migration round-trip on a scratch DB**~~ — **N/A (Step 3 skipped).**
+- [x] **Step 6: Sweeps** — `grep -rn "uploads/vids" backend/app/ --include='*.py'` → only `test_media_storage.py:41,44` (arbitrary example string in a generic unit test — cleaned in the noise sweep); `grep -rn "/media/vids/" backend/ nginx/` → only the nginx.conf:27 comment (cleaned in the noise sweep).
+- [x] **Step 7: Format, lint, type + commit** — same shape as the main pass (ruff format/check `--ignore B008`, mypy on the touched files, full `uv run pytest -v` green), then: *(gates green; commit = the Task 11+12 noise-sweep commit)*
 
 ```bash
 git add backend/app/config.py backend/app/services/video_service.py backend/migrations backend/app/tests/media/test_video_api.py backend/app/tests/media/test_media_stream.py nginx/nginx.conf
@@ -1216,15 +1216,17 @@ git commit -m "feat: rename uploads/vids to uploads/videos — config, X-Accel k
 
 **Why (learning):** the DB is the single truth for "orphaned": a tag with zero links is an orphan, period. Any Python-side "track what I just unlinked" logic re-implements link counting and drifts; the `NOT exists` query cannot.
 
-- [ ] **Step 1: Red-first probes** — for each of these, assert the row is **gone** after the operation, run, witness red (the row survives today):
+- [x] **Step 1: Red-first probes** — for each of these, assert the row is **gone** after the operation, run, witness red (the row survives today):
   1. Tag linked to exactly one book; admin `DELETE /books/{uid}` → `select(Tag)` count shows the tag row deleted
   2. Tag linked to two books; deleting one book → tag **survives** (never over-delete); deleting the second → gone
-  3. Video's last-linked tag: `soft_delete` the video → tag gone (video link is the only one)
+  3. ~~Video's last-linked tag: `soft_delete` the video → tag gone~~ `VideoService.delete` → tag gone *(renamed by the hard-delete amendment; ALREADY-GREEN — the sweep pre-implemented in `VideoRepo.delete`, honestly recorded, not a fake flip)*
   4. Author row whose only book is deleted → `authors` row gone; an author linked to two books survives until the last book goes
   5. Search purity guard: `search(BookSearchCriteria(author="nobody"))` still returns zero rows and creates nothing after all of the above (the D0-class no-mutation rule)
-- [ ] **Step 2: Implement** per Interfaces (repos first, service calls second).
-- [ ] **Step 3: Verify green** — `cd backend && uv run pytest -v` — all pass.
-- [ ] **Step 4: Format, lint, type + commit**:
+
+  *(Witnessed: probes 1/2/5 already-green via `BookRepo.delete_book`'s existing sweep + pure search; probes 4 red `assert 1 == 0` → green after implementation. `test_orphan_cleanup.py` 6/6.)*
+- [x] **Step 2: Implement** per Interfaces (repos first, service calls second). *(mypy-final shape: select orphan ids → one `delete(Entity.id.in_(...))` → `len()`; the plan-mandated update-sweep superseded the legacy `test_patch_empty_tags_clears_but_keeps_tag_rows` pin — flipped to `test_patch_empty_tags_clears_links_and_sweeps_orphans`: orphan tag swept, shared tag survives.)*
+- [x] **Step 3: Verify green** — `cd backend && uv run pytest -v` — all pass. *(186 passed.)*
+- [x] **Step 4: Format, lint, type + commit**:
 
 ```bash
 git add backend/app/repositories/tag_repo.py backend/app/repositories/author_repo.py backend/app/repositories/level_repo.py backend/app/repositories/genre_repo.py backend/app/services/book_service.py backend/app/services/video_service.py <test files>

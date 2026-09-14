@@ -192,14 +192,20 @@ def test_patch_title_description_tags_replace(db, client, auth):
     assert sorted(tag.name for tag in row.tags) == ["x", "y"]
 
 
-def test_patch_empty_tags_clears_but_keeps_tag_rows(db, client, auth):
+def test_patch_empty_tags_clears_links_and_sweeps_orphans(db, client, auth):
     vid = _seed_video(db)
-    tag = Tag(name="lesson")
-    db.add(tag)
-    db.flush()
-    vid.tags.append(tag)
+    shared_tag = Tag(name="lesson")
+    orphan_tag = Tag(name="orphan")
+    db.add_all([shared_tag, orphan_tag])
     db.commit()
-    tag_id = tag.id
+    db.refresh(shared_tag)
+    db.refresh(orphan_tag)
+    vid.tags.append(shared_tag)
+    vid.tags.append(orphan_tag)
+    other = _seed_video(db, title="other")
+    other.tags.append(shared_tag)
+    db.commit()
+    tag_id = orphan_tag.id
     response = client.patch(f"/videos/{vid.id}", params={"tags": ""}, headers=auth)
     assert response.status_code == 200
     assert response.json()["tags"] == []
@@ -207,7 +213,10 @@ def test_patch_empty_tags_clears_but_keeps_tag_rows(db, client, auth):
     row = db.query(Video).filter(Video.id == vid.id).first()
     assert row is not None
     assert row.tags == []
-    assert db.query(Tag).filter(Tag.id == tag_id).one().name == "lesson"
+    # orphan tag: its only link was cleared → row swept
+    assert db.query(Tag).filter(Tag.id == tag_id).first() is None
+    # shared tag: still linked to the other video → survives
+    assert db.query(Tag).filter(Tag.name == "lesson").first() is not None
 
 
 def test_patch_omitted_fields_unchanged(db, client, auth):
@@ -259,7 +268,7 @@ def test_stream_serves_x_accel_204(db, client, monkeypatch, tmp_path, auth):
     response = client.get(f"/videos/stream/{vid.id}", headers=auth)
     assert response.status_code == 204
     assert response.content == b""
-    assert response.headers["X-Accel-Redirect"] == f"/media/vids/{quote('clip.mp4')}"
+    assert response.headers["X-Accel-Redirect"] == f"/media/videos/{quote('clip.mp4')}"
     assert response.headers["Content-Type"] == mimetypes.guess_type("clip.mp4")[0]
     assert response.headers["Accept-Ranges"] == "bytes"
 

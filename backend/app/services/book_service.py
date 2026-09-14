@@ -5,6 +5,7 @@ from app.repositories.author_repo import AuthorRepo
 from app.repositories.book_repo import BookRepo
 from app.repositories.genre_repo import GenreRepo
 from app.repositories.level_repo import LevelRepo
+from app.repositories.tag_repo import TagRepo
 from app.schemas import BookCreate, BookRead, BookUpload, TagCreate
 from app.schemas.book_schema import BookSearchCriteria, BookUpdate, Page
 from app.services.book_errors import BookAlreadyExists, BookNotFound
@@ -27,6 +28,7 @@ class BookService:
         author_repo: AuthorRepo,
         level_repo: LevelRepo,
         genre_repo: GenreRepo,
+        tag_repo: TagRepo | None = None,
     ) -> None:
         self.book_repo = book_repo
         self.validator = validator
@@ -36,6 +38,9 @@ class BookService:
         self.author_repo = author_repo
         self.level_repo = level_repo
         self.genre_repo = genre_repo
+        self.tag_repo = (
+            tag_repo if tag_repo is not None else TagRepo(self.book_repo.db_session)
+        )
 
     def get_book_by_uid(self, book_uid: str) -> BookRead | None:
         book = self.book_repo.get_book_by_uid(book_uid)
@@ -75,6 +80,10 @@ class BookService:
         if not book:
             raise BookNotFound(f"Book with UID {book_uid} does not exist")
 
+        old_author_name = book.author.name if book.author else None
+        old_level_name = book.level.name if book.level else None
+        old_genre_name = book.genre.name if book.genre else None
+
         author_id = (
             self.author_repo.get_or_create_by_name(data.author).id
             if data.author
@@ -108,6 +117,16 @@ class BookService:
             ),
         )
         updated = self.book_repo.update_book(book_uid, book_update)
+
+        if data.author is not None and data.author.strip().lower() != old_author_name:
+            self.author_repo.delete_orphans()
+        if data.level is not None and data.level.strip().lower() != old_level_name:
+            self.level_repo.delete_orphans()
+        if data.genre is not None and data.genre.strip().lower() != old_genre_name:
+            self.genre_repo.delete_orphans()
+        if data.tags is not None:
+            self.tag_repo.delete_orphans()
+
         return BookRead.model_validate(updated)
 
     def delete_book(self, book_uid: str) -> None:
@@ -118,6 +137,10 @@ class BookService:
         if book.cover_path:
             self.storage.delete_cover(book.cover_path)
         self.book_repo.delete_book(book_uid)
+        self.tag_repo.delete_orphans()
+        self.author_repo.delete_orphans()
+        self.level_repo.delete_orphans()
+        self.genre_repo.delete_orphans()
 
     def create_from_upload(
         self,

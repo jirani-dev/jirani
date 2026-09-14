@@ -77,6 +77,8 @@ class VideoService:
             video.tags = list(self.tag_repo.get_or_create_by_names(tag_names))
         self.db.commit()
         self.db.refresh(video)
+        if tag_names is not None:
+            self.tag_repo.delete_orphans()
         return VideoView.model_validate(video)
 
     def delete(self, video_id: int) -> None:

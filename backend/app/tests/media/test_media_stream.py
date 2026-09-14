@@ -49,7 +49,7 @@ def test_stream_x_accel_204(db, client, stream_env, name, media_type):
     response = client.get(f"/videos/stream/{vid.id}", headers=headers)
     assert response.status_code == 204
     assert response.content == b""
-    assert response.headers["X-Accel-Redirect"] == f"/media/vids/{quote(name)}"
+    assert response.headers["X-Accel-Redirect"] == f"/media/videos/{quote(name)}"
     assert response.headers["Content-Type"] == media_type
     assert response.headers["Accept-Ranges"] == "bytes"
 
@@ -88,4 +88,4 @@ def test_stream_spaced_filename_quoted(db, client, stream_env):
     vid = _seed_video(db, file_path="my clip.mp4")
     response = client.get(f"/videos/stream/{vid.id}", headers=headers)
     assert response.status_code == 204
-    assert response.headers["X-Accel-Redirect"] == "/media/vids/my%20clip.mp4"
+    assert response.headers["X-Accel-Redirect"] == "/media/videos/my%20clip.mp4"

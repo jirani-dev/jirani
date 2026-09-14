@@ -38,10 +38,10 @@ def test_resolve_absolute_path_inside_dir(tmp_path: Path) -> None:
 
 def test_resolve_relative_path_joins_save_dir(tmp_path: Path) -> None:
     storage = MediaFileStorage(tmp_path)
-    legacy_dir = tmp_path / "uploads" / "vids"
+    legacy_dir = tmp_path / "uploads" / "videos"
     legacy_dir.mkdir(parents=True)
     (legacy_dir / "u1_x.mp4").write_bytes(b"x")
-    assert storage.resolve("uploads/vids/u1_x.mp4").read_bytes() == b"x"
+    assert storage.resolve("uploads/videos/u1_x.mp4").read_bytes() == b"x"
 
 
 def test_resolve_rejects_absolute_escape(tmp_path: Path) -> None:

@@ -1,4 +1,4 @@
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.models import Tag
@@ -7,6 +7,18 @@ from app.models import Tag
 class TagRepo:
     def __init__(self, db_session: Session):
         self.db_session = db_session
+
+    def delete_orphans(self) -> int:
+        orphan_ids = list(
+            self.db_session.scalars(
+                select(Tag.id).where(~Tag.books.any(), ~Tag.videos.any())
+            ).all()
+        )
+        if not orphan_ids:
+            return 0
+        self.db_session.execute(delete(Tag).where(Tag.id.in_(orphan_ids)))
+        self.db_session.commit()
+        return len(orphan_ids)
 
     def get_all_tags(self) -> list[Tag]:
         return list(self.db_session.scalars(select(Tag)).all())
