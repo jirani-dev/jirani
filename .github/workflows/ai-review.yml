@@ -33,7 +33,7 @@ jobs:
           if grep -qE '^diff --git a/backend/' /tmp/diff.txt; then
             echo "HAS_PY=true" >> "$GITHUB_ENV"
           else
-            echo "Docs-only diff — skipping model call" >> "$GITHUB_SUMMARY"
+            echo "Docs-only diff — skipping model call" >> "$GITHUB_STEP_SUMMARY"
             echo "HAS_PY=false" >> "$GITHUB_ENV"
           fi
 
@@ -87,7 +87,7 @@ jobs:
             echo "::error::no VERDICT line in auditor output — failing closed"
             exit 1
           fi
-          echo "$verdict" >> "$GITHUB_SUMMARY"
+          echo "$verdict" >> "$GITHUB_STEP_SUMMARY"
           if grep -q 'VIOLATION' <<< "$verdict"; then
             echo "::error::audit found violations — merge blocked"
             exit 1
