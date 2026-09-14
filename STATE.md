@@ -1,6 +1,6 @@
 # Project State — Jirani Offline Library Backend
 
-**Last Updated:** 2026-09-13 (commit a8c23ea, pushed) — media plan Task 5 (fused book rewrite + migration) complete, gate-verified; next Task 6 (tag fused rewrite)
+**Last Updated:** 2026-09-13 (commit 555fa20, pushed) — media plan Task 6 (tag fused rewrite) complete, gate-verified (audit PASS, verify DONE, 141 passed); next Task 7 (media leaves)
 **Branch:** refactor
 **Uncommitted:** STATE.md only; **push debt CLEARED 2026-09-13** — origin/refactor at a8c23ea (gh auth login + HTTPS credential helper)
 
@@ -127,7 +127,7 @@ Tracked so they shrink instead of becoming permanent. Hygiene plan closed 2026-0
  11b. [x] **Media refactor Task 3** — **COMPLETE 2026-09-02 (5e1d246)**: entity modules Author/Level/Genre, red-first, 18 entity tests + full suite 90 passed; `database.py` Base typed proper (user-approved).
  11c. [x] **Media refactor Task 4** — **COMPLETE 2026-09-02 (bcc0a70, ec837e0, 0ab0ae3, +cover commit)**: book leaf modules, four sections, each red-first with 0/0 gates; full suite 111 passed.
   11d. [x] **Media refactor Task 5** — **COMPLETE 2026-09-13 (a8c23ea, + c2c3a97 checkpoint):** repo/models/schemas (c2c3a97) + fused service/router/migration/tests commit (a8c23ea), all nine step boxes ticked, gate-verified (137 passed, audit PASS). Known leftover mypy rows now: book_schema 0, book.py 0, tag_repo 2, book_repo 0 — **tag_repo's 2 rows transfer to Task 6's gate (0/2 → 0/0).**
-  11d-next. [ ] **Media refactor Task 6 (next unchecked):** tag fused rewrite — 2.0 repo (`get_all_tags`, `get_or_create_by_names` in one query, delete dead `get_tag_by_id`/`create_tag`), new `tag_service.py`, router `RoleChecker`; red-first per plan:706-721; gate: `tag_repo.py` 0/2 → 0/0.
+  11d-next. [x] **Media refactor Task 6 — COMPLETE 2026-09-13 (555fa20):** tag fused rewrite — 2.0 repo (`get_all_tags`, `get_or_create_by_names` one-query semantics; `get_tag_by_id`/`create_tag` deleted with their pins, recorded in the commit message per plan:702), new `tag_service.py`, router `RoleChecker`; red witnessed (5× AttributeError + 200≠401) → 141 passed; tag_repo's 2 mypy rows struck (0/2 → 0/0). **Next: Task 7 (media leaves).**
   11f. [ ] **Media refactor Task 9 Step 5 (open):** after Task 8 lands the video stream endpoint, re-run the Range curl through nginx (`Range: bytes=0-99` → 206 + Content-Range) and record it — the pytest suite no longer owns Range (spec §6). Also delete the orphan `main.py:51` comment next time that file is touched. Task 9 Steps 1–4 + 6–7 already committed (cbdc214).
   11g. [x] **PUSH cbdc214 + c2c3a97 + a8c23ea** — **DONE 2026-09-13:** `gh auth login` (HTTPS + credential helper) cleared the `could not read Username` blocker; origin/refactor verified at a8c23ea via `git ls-remote`.
   11e. [x] ~~**PUSH c2c3a97 (2026-09-08 WIP checkpoint) before switching machines**~~ — merged into 11g, now done (credentials were set up 2026-09-13 via `gh auth login`).
