@@ -23,3 +23,6 @@ VERDICT: PASS
 
 The final line must be literally `VERDICT: PASS` or `VERDICT: VIOLATION`.
 If you cannot produce it, the check fails closed.
+
+Example finding line (shape only, do not copy content):
+- Invariant 4 backend/app/repositories/example_repo.py:18 — new `query()` call in changed code; the touched line must use `select()`.

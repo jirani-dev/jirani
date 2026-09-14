@@ -12,7 +12,7 @@ and **must be green** before merge:
 Expected responses:
 
 - Red `quality`: read the failure log, fix, push. The commands runnable locally are in `ONBOARDING.md` §6.
-- Red `ai-review`: read the auditor's PR comment. Fix genuine violations. If you believe the finding is wrong, say so in a PR comment ("I disagree because …") — the auditor reports, humans judge.
+- Red `ai-review`: read the auditor's PR comment. Fix genuine violations. If you believe the finding is wrong, say so in a PR comment ("I disagree because …") — the auditor reports, humans judge. Example of a good pushback: *"`ai-review` flagged Invariant 2 at `auth_service.py:88`, but that line is untouched by this diff — pre-existing per the debt table."*
 - Never push generated media, secrets, or `.venv`. Never force-push to the mainline.
 
 Commit messages follow the repo style: `feat:`, `fix:`, `test:`, `refactor:`, `chore:`, `ci:`, `docs:`.

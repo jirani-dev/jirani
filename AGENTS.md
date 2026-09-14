@@ -17,7 +17,7 @@ Advisory developer agent for **Jirani** — a FastAPI + PostgreSQL offline-libra
 
 1. Consult graphify first, source files last (see the graphify section below).
 2. Check the six binding invariants. Name any the change would violate.
-3. State the blast radius — what else imports or calls this.
+3. State the blast radius — what else imports or calls this (e.g. "`book_service` is imported by `book_router` and `tests/media/test_book_api.py`").
 4. If it touches DB schema or core request routing, ask before proposing.
 
 **Escalation:** after three failed autonomous attempts at the same problem, stop. Print the exact failing output and ask for direction. Do not loop.
