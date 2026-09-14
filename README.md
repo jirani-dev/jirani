@@ -6,7 +6,7 @@ tour, `CONTRIBUTING.md` has the PR rules, `AGENTS.md` is the rulebook.
 ## Run with Docker
 
 ```bash
-docker compose up -d --build    # nginx on :80 (the only published port), API at /api/*, Postgres on :5432
+docker compose up -d --build    # nginx on :80 (the only published HTTP port), API at /api/*, Postgres on :5432
 docker compose down             # stop
 docker compose down -v          # stop and remove the database volume
 ```
