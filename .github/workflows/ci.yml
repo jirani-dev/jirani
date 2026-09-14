@@ -40,7 +40,7 @@ jobs:
             range=""
           fi
           if [ -n "$range" ]; then
-            files=$(git diff --name-only --relative "$range" -- '*.py' || true)
+            files=$(git diff --name-only --relative "$range" -- '*.py' | tr '\n' ' ' || true)
           else
             files=""
           fi
