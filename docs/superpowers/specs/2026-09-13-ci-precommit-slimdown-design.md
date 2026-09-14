@@ -13,12 +13,13 @@
 | D1 | `master` = future mainline + hub. It absorbs `refactor`'s agent config (`.opencode/`, `AGENTS.md`) at merge time. |
 | D2 | Branch `tooling/ci-precommit` cut off `refactor` @ `bfec38f`; merges into `refactor`. Hub activates at the later `refactor → master` merge. |
 | D3 | State machinery removed: `STATE.md`, `state` skill, `todo` skill, `plan-auditor` agent, `/next` command. Resume point lives in plan checkboxes; decisions live in `docs/team/decisions.md`; reminders live in an issue tracker. |
-| D4 | Kept: graphify (query-first rule + plugin) and the AI quality gates (`invariant-auditor`, `verifier`, `/done`). |
+| D4 | Kept: graphify (query-first rule + plugin) and the AI quality gates — **consolidated 2026-09-14 into one `review` agent** (D10), so this originally meant (`invariant-auditor`, `verifier`, `/done`). |
 | D5 | Removed: `coder` agent + `/coder` command (teammates write their own code). |
 | D6 | TDD scoped: **binding** (failing test first) for bugfixes and service-layer logic — auth, permissions, media validation; **tests required, order free** for routers, config, migrations. pytest stays a required CI check regardless. |
 | D7 | Plans slim into specs going forward: a spec carries design + acceptance criteria + task checklist. No more learner-edition verbatim-code plans. |
 | D8 | The AGENTS.md tick-the-box rule is scoped to the media plan (see header note), removed at its completion. |
 | D9 | Guidebook: `ONBOARDING.md` (agent tooling tour) + `CONTRIBUTING.md` + `docs/team/{onboarding,workflow,decisions}.md`. `docs/team/rules.md` is **dropped** — `AGENTS.md` rides to master (D1), one source of truth. |
+| D10 | One review agent (added 2026-09-14): `agent/review.md` (kimi-k3, read-only) replaces `invariant-auditor` + `verifier` — runs the DoD commands and audits the diff against AGENTS.md's invariant table (read live, never copied), one combined `DONE`/`NOT DONE` verdict. `/done` dispatches it. Rationale: CI now runs both gates (`quality` mechanical, `ai-review` judgment); three local copies of review logic was two too many. CI is unchanged. |
 
 ## 2. Workflow shape (post-change)
 
@@ -57,7 +58,7 @@ Ruff version pinned to `uv.lock`'s 0.16.3 so the hook and `uv run ruff` never di
 
 ## 5. Slim-down — AGENTS.md becomes team-clean
 
-**Delete files:** `STATE.md`, `.opencode/skills/state/`, `.opencode/skills/todo/`, `.opencode/agent/plan-auditor.md`, `.opencode/agent/coder.md`, `.opencode/commands/next.md`, `.opencode/commands/coder.md`. Kept: `agent/{invariant-auditor,verifier}.md`, `commands/done.md`, `plugins/graphify.js`.
+**Delete files:** `STATE.md`, `.opencode/skills/state/`, `.opencode/skills/todo/`, `.opencode/agent/plan-auditor.md`, `.opencode/agent/coder.md`, `.opencode/commands/next.md`, `.opencode/commands/coder.md`. Kept: `agent/review.md` (consolidated per D10), `commands/done.md`, `plugins/graphify.js`.
 
 **Before deleting:** mine `STATE.md` — Decisions Log and Graveyard entries with durable value migrate into `docs/team/decisions.md` (§8); the media-plan resume point is already carried by its unchecked boxes (Task 7 next).
 

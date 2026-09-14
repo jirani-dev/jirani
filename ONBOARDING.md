@@ -26,8 +26,7 @@ create a database by hand).
 | Path | What it is |
 |---|---|
 | `opencode.jsonc` | Shared config: plugins, MCP servers, and the **permission block** that enforces what the agent may not touch (app source, DB schema, destructive git ops) |
-| `agent/invariant-auditor.md` | Reviews any change against the six invariants — used by the CI gate and by `/done` |
-| `agent/verifier.md` | Runs the Definition-of-Ded commands and reports pass/fail — run before claiming anything works |
+| `agent/review.md` | The one review gate — runs the DoD commands (ruff, mypy, pytest) AND audits the diff against the six invariants from AGENTS.md, one combined verdict. Used by `/done` and before claiming anything works |
 | `commands/done.md` | `/done` — one gate: invariant audit + DoD verification together |
 | `plugins/graphify.js` | The knowledge-graph plugin |
 

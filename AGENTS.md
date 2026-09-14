@@ -101,17 +101,15 @@ Subagents run in a **child session with their own context**. Their tool output �
 
 | Agent | Model | Writes? | Use it when | Returns |
 |---|---|---|---|---|
-| `invariant-auditor` | `kimi-k3` | no | after any change to `backend/app/**`, before committing, when reviewing a proposed snippet | PASS/VIOLATION per invariant with `file:line`, and a commit/do-not-commit verdict |
-| `verifier` | `deepseek-v4-flash` | no | before claiming anything is done, before committing | Pass/fail per DoD command, full output of failures only |
+| `review` | `kimi-k3` | no | before claiming anything is done, before committing, when reviewing a diff or a proposed snippet | DoD pass/fail per command + invariant findings with `file:line` + one combined `DONE`/`NOT DONE` verdict |
 
-**Why these models:** the `verifier` runs the DoD commands — mechanical, no judgment, cheap model correct. The `invariant-auditor` gets `kimi-k3` because it is the one subagent doing real reasoning — it must distinguish a *new* invariant violation from the pre-existing debt listed in this file, and a weak model there either false-alarms (you learn to ignore it) or misses real ones (worse). The same kimi-k3 audit runs as the CI `ai-review` check on every PR. Pay for judgment only where judgment lives.
+**Why kimi-k3:** the agent does real reasoning — it must distinguish a *new* invariant violation from the pre-existing debt listed in this file's invariant table, and a weak model there either false-alarms (you learn to ignore it) or misses real ones (worse). The mechanical DoD commands ride along in the same dispatch; at local frequency the model cost is trivial. The same kimi-k3 audit runs as the CI `ai-review` check on every PR — same model, same contract, agreeing verdicts. Pay for judgment only where judgment lives.
 
-**Invocation:** `@invariant-auditor <request>` / `@verifier <request>` to run one directly, or `/done` (audit + verify, one gate).
+**Invocation:** `@review <what to gate>` to run one directly, or `/done` for the plan-task version that resolves the task box, dispatches the gate, and ticks on green (grandfathered to the media refactor plan).
 
 **When the primary agent should dispatch one without being asked:**
 
-- About to say "this is done" or "tests pass" → `verifier` first. A completion claim without its output is a guess.
-- Reviewing a diff longer than ~50 lines → `invariant-auditor`, so the review does not consume primary context.
+- About to say "this is done" or "tests pass", or reviewing a diff longer than ~50 lines → `review` first. A completion claim without its output is a guess; the dispatch also keeps long review output out of primary context.
 - Two or more genuinely independent read-only questions → dispatch in parallel, one subagent each.
 
 **Do not** dispatch a subagent for a single file read, a question already answered in this session, or anything needing conversation history — subagents start cold and know only what the dispatch prompt tells them. Write the prompt as if to a competent stranger: state the task, the files, and the exact shape of the answer you want back.
