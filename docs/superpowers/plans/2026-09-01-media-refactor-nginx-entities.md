@@ -1291,10 +1291,10 @@ Note: audio ID3 metadata stays with D0 — this task is the video half of the ol
 - Read endpoints unchanged: `GET /videos/`, `GET /videos/stream/{id}` → `RoleChecker([admin, teacher, student])`
 - Write endpoints tighten: `POST /videos/upload`, `POST /videos/upload_multiple`, `PATCH /videos/{id}`, `DELETE /videos/{id}` → `RoleChecker([admin, teacher])`. Tokens carry the role in the JWT — no other backend change. (The audio endpoints stay zero-auth under D0 — the loud warning stands)
 
-- [ ] **Step 1: Red-first probes** — login a student (harness idiom), then each of the four write verbs with the student token → assert `403` detail. Run → red: today every one returns 200/201/422-class responses because the guard list includes `student`.
-- [ ] **Step 2: Implement** the four Depends-list changes.
-- [ ] **Step 3: Verify green** — `cd backend && uv run pytest -v` — full suite incl. the new 403 probes and all existing admin/teacher write paths.
-- [ ] **Step 4: Format, lint, type + commit**
+- [x] **Step 1: Red-first probes** — login a student (harness idiom), then each of the four write verbs with the student token → assert `403` detail. Run → red: today every one returns 200/201/422-class responses because the guard list includes `student`. *(Witnessed: 4 failed `assert 200 == 403`; wrong-role = 403 per auth.py:51; student read probes green.)*
+- [x] **Step 2: Implement** the four Depends-list changes. *(WRITE_ROLES on the four write endpoints, ROLES kept on the two GETs.)*
+- [x] **Step 3: Verify green** — `cd backend && uv run pytest -v` — full suite incl. the new 403 probes and all existing admin/teacher write paths. *(192 passed.)*
+- [x] **Step 4: Format, lint, type + commit** *(ruff clean, mypy 0 from video_router — 20 pre-existing audio rows via imports.)*
 
 ```bash
 git add backend/app/api/video_router.py backend/app/tests/media/test_video_api.py

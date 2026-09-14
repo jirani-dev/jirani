@@ -290,6 +290,70 @@ def test_stream_deleted_video_404(db, client, monkeypatch, tmp_path, auth):
     assert response.status_code == 404
 
 
+@pytest.fixture()
+def student_auth(client, setup_paths) -> dict[str, str]:
+    admin_pw = setup_admin(client, setup_paths)
+    admin_token = login(client, "admin", admin_pw)["access_token"]
+    response = client.post(
+        "/auth/users/bulk",
+        json={"count": 1, "role": "student", "prefix": "stu"},
+        headers=auth_headers(admin_token),
+    )
+    assert response.status_code == 201, response.text
+    accounts = response.json()["accounts"]
+    student = accounts[0]
+    token = login(client, student["username"], student["password"])["access_token"]
+    return auth_headers(token)
+
+
+@pytest.mark.parametrize(
+    "method, path, kwargs",
+    [
+        (
+            "post",
+            "/videos/upload",
+            {
+                "files": {"file": ("clip.mp4", b"bytes", "video/mp4")},
+                "data": {"title": "T"},
+            },
+        ),
+        (
+            "post",
+            "/videos/upload_multiple",
+            {"files": [("files", ("a.mp4", b"bytes", "video/mp4"))]},
+        ),
+        ("patch", "/videos/{id}", {"params": {"title": "x"}}),
+        ("delete", "/videos/{id}", {}),
+    ],
+)
+def test_student_write_endpoints_403(
+    db, client, monkeypatch, tmp_path, student_auth, method, path, kwargs
+):
+    _patch_video_dir(monkeypatch, tmp_path)
+    vid = _seed_video(db)
+    response = getattr(client, method)(
+        path.format(id=vid.id), headers=student_auth, **kwargs
+    )
+    assert response.status_code == 403
+
+
+def test_student_can_list_videos(db, client, student_auth):
+    _seed_video(db, title="a")
+    response = client.get("/videos/", headers=student_auth)
+    assert response.status_code == 200
+    assert len(response.json()) == 1
+
+
+def test_student_can_stream_video(db, client, monkeypatch, tmp_path, student_auth):
+    _patch_video_dir(monkeypatch, tmp_path)
+    video_file = tmp_path / "vids" / "clip.mp4"
+    video_file.write_bytes(b"\x00\x01\x02\x03" * 100)
+    vid = _seed_video(db, file_path=str(video_file))
+    response = client.get(f"/videos/stream/{vid.id}", headers=student_auth)
+    assert response.status_code == 204
+    assert response.headers["X-Accel-Redirect"] == f"/media/videos/{quote('clip.mp4')}"
+
+
 def test_stream_missing_file_404(db, client, monkeypatch, tmp_path, auth):
     _patch_video_dir(monkeypatch, tmp_path)
     vid = _seed_video(db, file_path=str(tmp_path / "vids" / "gone.mp4"))

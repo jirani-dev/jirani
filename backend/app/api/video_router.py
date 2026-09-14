@@ -16,6 +16,7 @@ from app.services.video_service import VideoService
 router = APIRouter(prefix="/videos", tags=["videos"])
 
 ROLES = [RoleEnum.admin, RoleEnum.teacher, RoleEnum.student]
+WRITE_ROLES = [RoleEnum.admin, RoleEnum.teacher]
 
 
 def get_video_service(db: Session = Depends(get_db)) -> VideoService:
@@ -37,7 +38,7 @@ async def upload_video(
     description: str | None = Form(None),
     tags: str = Form(""),
     svc: VideoService = Depends(get_video_service),
-    user: Account = Depends(RoleChecker(ROLES)),
+    user: Account = Depends(RoleChecker(WRITE_ROLES)),
 ) -> VideoView:
     data = await file.read()
     tag_names = [t.strip() for t in tags.split(",") if t.strip()]
@@ -59,7 +60,7 @@ async def upload_video(
 async def upload_multiple_videos(
     files: list[UploadFile] = File(...),
     svc: VideoService = Depends(get_video_service),
-    user: Account = Depends(RoleChecker(ROLES)),
+    user: Account = Depends(RoleChecker(WRITE_ROLES)),
 ) -> list[VideoView]:
     payloads = [(await file.read(), file.filename or "") for file in files]
     try:
@@ -77,7 +78,7 @@ def update_video(
     description: str | None = None,
     tags: str | None = None,
     svc: VideoService = Depends(get_video_service),
-    user: Account = Depends(RoleChecker(ROLES)),
+    user: Account = Depends(RoleChecker(WRITE_ROLES)),
 ) -> VideoView:
     tag_names = (
         [t.strip() for t in tags.split(",") if t.strip()] if tags is not None else None
@@ -94,7 +95,7 @@ def update_video(
 def delete_video(
     video_id: int,
     svc: VideoService = Depends(get_video_service),
-    user: Account = Depends(RoleChecker(ROLES)),
+    user: Account = Depends(RoleChecker(WRITE_ROLES)),
 ) -> None:
     try:
         svc.delete(video_id)
