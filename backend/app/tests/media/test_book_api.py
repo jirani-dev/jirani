@@ -1,11 +1,14 @@
 import io
 import zipfile
 from pathlib import Path
+from typing import Any
 from urllib.parse import quote
 
 import pymupdf
 import pytest
+from fastapi.testclient import TestClient
 from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.models.author import Author
@@ -29,7 +32,7 @@ from app.tests.conftest import auth_headers, login, setup_admin
 PNG_BYTES = b"\x89PNG\r\n\x1a\n" + b"\x00" * 100
 
 
-def _seed_book(db, *, uid: str, **kwargs) -> Book:
+def _seed_book(db: Session, *, uid: str, **kwargs: Any) -> Book:
     book = Book(
         uid=uid,
         title=kwargs.pop("title", f"Title {uid}"),
@@ -43,7 +46,7 @@ def _seed_book(db, *, uid: str, **kwargs) -> Book:
     return book
 
 
-def _make_svc(db) -> BookService:
+def _make_svc(db: Session) -> BookService:
     return BookService(
         book_repo=BookRepo(db),
         validator=ContentValidator(),
@@ -63,17 +66,17 @@ def _patch_dirs(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     (tmp_path / "covers").mkdir()
 
 
-def _admin_headers(client, setup_paths) -> dict[str, str]:
+def _admin_headers(client: TestClient, setup_paths: Path) -> dict[str, str]:
     admin_pw = setup_admin(client, setup_paths)
     token = login(client, "admin", admin_pw)["access_token"]
     return auth_headers(token)
 
 
 def _make_pdf() -> bytes:
-    doc = pymupdf.open()
+    doc = pymupdf.open()  # type: ignore[no-untyped-call]
     doc.new_page()
-    data = doc.tobytes()
-    doc.close()
+    data: bytes = doc.tobytes()  # type: ignore[no-untyped-call]
+    doc.close()  # type: ignore[no-untyped-call]
     return data
 
 
@@ -109,7 +112,12 @@ def _make_epub(path: Path) -> None:
 
 
 @pytest.fixture()
-def stream_env(client, setup_paths, monkeypatch, tmp_path):
+def stream_env(
+    client: TestClient,
+    setup_paths: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> tuple[Path, dict[str, str]]:
     monkeypatch.setattr(settings, "UPLOAD_DIR", tmp_path)
     admin_pw = setup_admin(client, setup_paths)
     token = login(client, "admin", admin_pw)["access_token"]
@@ -118,7 +126,12 @@ def stream_env(client, setup_paths, monkeypatch, tmp_path):
 
 
 @pytest.fixture()
-def read_env(client, setup_paths, monkeypatch, tmp_path):
+def read_env(
+    client: TestClient,
+    setup_paths: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> tuple[Path, dict[str, str]]:
     monkeypatch.setattr(settings, "UPLOAD_DIR", tmp_path)
     admin_pw = setup_admin(client, setup_paths)
     token = login(client, "admin", admin_pw)["access_token"]
@@ -126,7 +139,7 @@ def read_env(client, setup_paths, monkeypatch, tmp_path):
     return tmp_path, headers
 
 
-def test_update_book_persists_title(db):
+def test_update_book_persists_title(db: Session) -> None:
     _seed_book(db, uid="bkupd001")
     updated = _make_svc(db).update_book("bkupd001", BookUpdate(title="Renamed"))
     assert updated.title == "Renamed"
@@ -135,12 +148,14 @@ def test_update_book_persists_title(db):
     assert row.title == "Renamed"
 
 
-def test_update_book_missing_raises_book_not_found(db):
+def test_update_book_missing_raises_book_not_found(db: Session) -> None:
     with pytest.raises(BookNotFound):
         _make_svc(db).update_book("missing1", BookUpdate(title="Renamed"))
 
 
-def test_delete_book_removes_row_file_and_cover(db, monkeypatch, tmp_path):
+def test_delete_book_removes_row_file_and_cover(
+    db: Session, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     _patch_dirs(monkeypatch, tmp_path)
     _seed_book(
         db, uid="bkdel0001", file_path="bkdel0001.pdf", cover_path="bkdel0001.jpg"
@@ -157,12 +172,14 @@ def test_delete_book_removes_row_file_and_cover(db, monkeypatch, tmp_path):
     assert not (tmp_path / "covers" / "bkdel0001.jpg").exists()
 
 
-def test_delete_book_missing_raises_book_not_found(db):
+def test_delete_book_missing_raises_book_not_found(db: Session) -> None:
     with pytest.raises(BookNotFound):
         _make_svc(db).delete_book("missing1")
 
 
-def test_get_book_file_returns_contained_existing_path(db, monkeypatch, tmp_path):
+def test_get_book_file_returns_contained_existing_path(
+    db: Session, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     _patch_dirs(monkeypatch, tmp_path)
     _seed_book(db, uid="bkget0001", file_path="bkget0001.pdf")
     (tmp_path / "books" / "bkget0001.pdf").write_bytes(b"%PDF-1.4 seed")
@@ -173,12 +190,14 @@ def test_get_book_file_returns_contained_existing_path(db, monkeypatch, tmp_path
     assert path.is_file()
 
 
-def test_get_book_file_missing_book_raises_book_not_found(db):
+def test_get_book_file_missing_book_raises_book_not_found(db: Session) -> None:
     with pytest.raises(BookNotFound):
         _make_svc(db).get_book_file("missing1")
 
 
-def test_get_book_file_missing_on_disk_raises_book_not_found(db, monkeypatch, tmp_path):
+def test_get_book_file_missing_on_disk_raises_book_not_found(
+    db: Session, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     _patch_dirs(monkeypatch, tmp_path)
     _seed_book(db, uid="bkget0002", file_path="bkget0002.pdf")
 
@@ -186,7 +205,13 @@ def test_get_book_file_missing_on_disk_raises_book_not_found(db, monkeypatch, tm
         _make_svc(db).get_book_file("bkget0002")
 
 
-def test_upload_pdf_happy_path(db, client, monkeypatch, tmp_path, setup_paths):
+def test_upload_pdf_happy_path(
+    db: Session,
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    setup_paths: Path,
+) -> None:
     monkeypatch.setattr(settings, "UPLOAD_DIR", tmp_path)
     headers = _admin_headers(client, setup_paths)
     response = client.post(
@@ -203,8 +228,12 @@ def test_upload_pdf_happy_path(db, client, monkeypatch, tmp_path, setup_paths):
 
 
 def test_upload_bad_magic_400_nothing_on_disk(
-    db, client, monkeypatch, tmp_path, setup_paths
-):
+    db: Session,
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    setup_paths: Path,
+) -> None:
     monkeypatch.setattr(settings, "UPLOAD_DIR", tmp_path)
     headers = _admin_headers(client, setup_paths)
     response = client.post(
@@ -217,7 +246,9 @@ def test_upload_bad_magic_400_nothing_on_disk(
     assert not list(tmp_path.glob("*.pdf"))
 
 
-def test_upload_requires_auth(client, monkeypatch, tmp_path):
+def test_upload_requires_auth(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     monkeypatch.setattr(settings, "UPLOAD_DIR", tmp_path)
     response = client.post(
         "/books/upload",
@@ -227,7 +258,13 @@ def test_upload_requires_auth(client, monkeypatch, tmp_path):
     assert response.status_code in (401, 403)
 
 
-def test_upload_genre_form_linked(db, client, monkeypatch, tmp_path, setup_paths):
+def test_upload_genre_form_linked(
+    db: Session,
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    setup_paths: Path,
+) -> None:
     monkeypatch.setattr(settings, "UPLOAD_DIR", tmp_path)
     headers = _admin_headers(client, setup_paths)
     response = client.post(
@@ -244,7 +281,13 @@ def test_upload_genre_form_linked(db, client, monkeypatch, tmp_path, setup_paths
     assert row.genre.name == "sci-fi"
 
 
-def test_upload_author_form_stored(db, client, monkeypatch, tmp_path, setup_paths):
+def test_upload_author_form_stored(
+    db: Session,
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    setup_paths: Path,
+) -> None:
     monkeypatch.setattr(settings, "UPLOAD_DIR", tmp_path)
     headers = _admin_headers(client, setup_paths)
     response = client.post(
@@ -261,7 +304,13 @@ def test_upload_author_form_stored(db, client, monkeypatch, tmp_path, setup_path
     assert row.author.name == "ada lovelace"
 
 
-def test_upload_overlong_title_400(db, client, monkeypatch, tmp_path, setup_paths):
+def test_upload_overlong_title_400(
+    db: Session,
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    setup_paths: Path,
+) -> None:
     monkeypatch.setattr(settings, "UPLOAD_DIR", tmp_path)
     headers = _admin_headers(client, setup_paths)
     response = client.post(
@@ -274,7 +323,7 @@ def test_upload_overlong_title_400(db, client, monkeypatch, tmp_path, setup_path
     assert not list(tmp_path.glob("*.pdf"))
 
 
-def test_search_genre_filter_and_entities(db):
+def test_search_genre_filter_and_entities(db: Session) -> None:
     author = Author(name="Ada")
     genre = Genre(name="scifi")
     db.add(author)
@@ -294,13 +343,13 @@ def test_search_genre_filter_and_entities(db):
     assert page.items[0].genre == "scifi"
 
 
-def test_search_unknown_author_matches_nothing(db):
+def test_search_unknown_author_matches_nothing(db: Session) -> None:
     _seed_book(db, uid="bk0001")
     page = BookRepo(db).search(BookSearchCriteria(author="nobody"), limit=10, offset=0)
     assert page.total == 0
 
 
-def test_search_tags_or_semantics_and_honest_total(db):
+def test_search_tags_or_semantics_and_honest_total(db: Session) -> None:
     b1 = _seed_book(db, uid="bk0001")
     b2 = _seed_book(db, uid="bk0002")
     t_math = Tag(name="math")
@@ -319,7 +368,7 @@ def test_search_tags_or_semantics_and_honest_total(db):
     assert {item.uid for item in page.items} == {"bk0001", "bk0002"}
 
 
-def test_search_metadata_containment(db):
+def test_search_metadata_containment(db: Session) -> None:
     _seed_book(db, uid="bk0001", metadata_={"publisher": "Penguin"})
     _seed_book(db, uid="bk0002", metadata_={"publisher": "Puffin"})
     page = BookRepo(db).search(
@@ -329,7 +378,7 @@ def test_search_metadata_containment(db):
     assert [item.uid for item in page.items] == ["bk0001"]
 
 
-def test_search_pagination_pages_are_disjoint_and_complete(db):
+def test_search_pagination_pages_are_disjoint_and_complete(db: Session) -> None:
     for i in range(5):
         _seed_book(db, uid=f"bk{i:04d}")
     pages = [
@@ -342,7 +391,9 @@ def test_search_pagination_pages_are_disjoint_and_complete(db):
     assert set().union(*uid_sets) == {f"bk{i:04d}" for i in range(5)}
 
 
-def test_list_books_endpoint_authed_returns_page(db, client, setup_paths):
+def test_list_books_endpoint_authed_returns_page(
+    db: Session, client: TestClient, setup_paths: Path
+) -> None:
     _seed_book(db, uid="bklist01")
     admin_pw = setup_admin(client, setup_paths)
     token = login(client, "admin", admin_pw)["access_token"]
@@ -353,12 +404,14 @@ def test_list_books_endpoint_authed_returns_page(db, client, setup_paths):
     assert body["items"][0]["uid"] == "bklist01"
 
 
-def test_list_books_unauthenticated_401(client):
+def test_list_books_unauthenticated_401(client: TestClient) -> None:
     response = client.get("/books/")
     assert response.status_code == 401
 
 
-def test_stream_authed_returns_x_accel_204(db, client, stream_env):
+def test_stream_authed_returns_x_accel_204(
+    db: Session, client: TestClient, stream_env: tuple[Path, dict[str, str]]
+) -> None:
     tmp_path, headers = stream_env
     uid = "abc123"
     (tmp_path / f"{uid}.pdf").write_bytes(b"%PDF-1.4 mock")
@@ -371,27 +424,35 @@ def test_stream_authed_returns_x_accel_204(db, client, stream_env):
     assert response.headers["Accept-Ranges"] == "bytes"
 
 
-def test_stream_missing_book_404(client, stream_env):
+def test_stream_missing_book_404(
+    client: TestClient, stream_env: tuple[Path, dict[str, str]]
+) -> None:
     _, headers = stream_env
     response = client.get("/books/nonexistent/stream", headers=headers)
     assert response.status_code == 404
 
 
-def test_stream_poisoned_file_path_404(db, client, stream_env):
+def test_stream_poisoned_file_path_404(
+    db: Session, client: TestClient, stream_env: tuple[Path, dict[str, str]]
+) -> None:
     _, headers = stream_env
     _seed_book(db, uid="evil", file_path="../../../../etc/passwd")
     response = client.get("/books/evil/stream", headers=headers)
     assert response.status_code == 404
 
 
-def test_stream_missing_file_on_disk_404(db, client, stream_env):
+def test_stream_missing_file_on_disk_404(
+    db: Session, client: TestClient, stream_env: tuple[Path, dict[str, str]]
+) -> None:
     _, headers = stream_env
     _seed_book(db, uid="gone", file_path="gone.pdf")
     response = client.get("/books/gone/stream", headers=headers)
     assert response.status_code == 404
 
 
-def test_stream_unauthenticated_401(db, client, stream_env):
+def test_stream_unauthenticated_401(
+    db: Session, client: TestClient, stream_env: tuple[Path, dict[str, str]]
+) -> None:
     tmp_path, _ = stream_env
     uid = "abc123"
     (tmp_path / f"{uid}.pdf").write_bytes(b"%PDF-1.4 mock")
@@ -400,7 +461,9 @@ def test_stream_unauthenticated_401(db, client, stream_env):
     assert response.status_code == 401
 
 
-def test_stream_epub_content_type(db, client, stream_env):
+def test_stream_epub_content_type(
+    db: Session, client: TestClient, stream_env: tuple[Path, dict[str, str]]
+) -> None:
     tmp_path, headers = stream_env
     uid = "epub1"
     (tmp_path / f"{uid}.epub").write_bytes(b"PK\x03\x04 mock")
@@ -409,7 +472,13 @@ def test_stream_epub_content_type(db, client, stream_env):
     assert response.headers["Content-Type"] == "application/epub+zip"
 
 
-def test_put_replaces_old_cover(db, client, monkeypatch, tmp_path, setup_paths):
+def test_put_replaces_old_cover(
+    db: Session,
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    setup_paths: Path,
+) -> None:
     _patch_dirs(monkeypatch, tmp_path)
     headers = _admin_headers(client, setup_paths)
     _seed_book(db, uid="bkcov0001", cover_path="bkcov0001.jpg")
@@ -433,8 +502,12 @@ def test_put_replaces_old_cover(db, client, monkeypatch, tmp_path, setup_paths):
 
 
 def test_put_rejects_executable_magic_400(
-    db, client, monkeypatch, tmp_path, setup_paths
-):
+    db: Session,
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    setup_paths: Path,
+) -> None:
     _patch_dirs(monkeypatch, tmp_path)
     headers = _admin_headers(client, setup_paths)
     _seed_book(db, uid="bkcov0002")
@@ -450,7 +523,13 @@ def test_put_rejects_executable_magic_400(
     assert list((tmp_path / "covers").iterdir()) == []
 
 
-def test_put_without_cover_keeps_cover(db, client, monkeypatch, tmp_path, setup_paths):
+def test_put_without_cover_keeps_cover(
+    db: Session,
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    setup_paths: Path,
+) -> None:
     _patch_dirs(monkeypatch, tmp_path)
     headers = _admin_headers(client, setup_paths)
     _seed_book(db, uid="bkcov0003", cover_path="bkcov0003.jpg")
@@ -467,7 +546,13 @@ def test_put_without_cover_keeps_cover(db, client, monkeypatch, tmp_path, setup_
     assert (tmp_path / "covers" / "bkcov0003.jpg").exists()
 
 
-def test_put_empty_cover_bytes_400(db, client, monkeypatch, tmp_path, setup_paths):
+def test_put_empty_cover_bytes_400(
+    db: Session,
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    setup_paths: Path,
+) -> None:
     _patch_dirs(monkeypatch, tmp_path)
     headers = _admin_headers(client, setup_paths)
     _seed_book(db, uid="bkcov0004")
@@ -483,7 +568,13 @@ def test_put_empty_cover_bytes_400(db, client, monkeypatch, tmp_path, setup_path
     assert list((tmp_path / "covers").iterdir()) == []
 
 
-def test_put_oversized_cover_400(db, client, monkeypatch, tmp_path, setup_paths):
+def test_put_oversized_cover_400(
+    db: Session,
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    setup_paths: Path,
+) -> None:
     _patch_dirs(monkeypatch, tmp_path)
     monkeypatch.setattr(settings, "MAX_COVER_SIZE", 10)
     headers = _admin_headers(client, setup_paths)
@@ -500,7 +591,9 @@ def test_put_oversized_cover_400(db, client, monkeypatch, tmp_path, setup_paths)
     assert list((tmp_path / "covers").iterdir()) == []
 
 
-def test_read_pdf_book_serves_original(db, client, read_env):
+def test_read_pdf_book_serves_original(
+    db: Session, client: TestClient, read_env: tuple[Path, dict[str, str]]
+) -> None:
     tmp_path, headers = read_env
     uid = "pdfbook"
     (tmp_path / f"{uid}.pdf").write_bytes(b"%PDF-1.4 mock")
@@ -513,7 +606,9 @@ def test_read_pdf_book_serves_original(db, client, read_env):
     assert response.headers["Accept-Ranges"] == "bytes"
 
 
-def test_read_epub_converts_to_read_pdf(db, client, read_env):
+def test_read_epub_converts_to_read_pdf(
+    db: Session, client: TestClient, read_env: tuple[Path, dict[str, str]]
+) -> None:
     tmp_path, headers = read_env
     uid = "epubbook"
     _make_epub(tmp_path / f"{uid}.epub")
@@ -528,7 +623,12 @@ def test_read_epub_converts_to_read_pdf(db, client, read_env):
     assert converted.read_bytes()[:5] == b"%PDF-"
 
 
-def test_read_converter_failure_404(db, client, read_env, monkeypatch):
+def test_read_converter_failure_404(
+    db: Session,
+    client: TestClient,
+    read_env: tuple[Path, dict[str, str]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     tmp_path, headers = read_env
     uid = "brokencv"
     (tmp_path / f"{uid}.epub").write_bytes(b"PK\x03\x04 mock")
@@ -539,7 +639,12 @@ def test_read_converter_failure_404(db, client, read_env, monkeypatch):
     assert response.json()["detail"] == "Book not readable"
 
 
-def test_read_epub_second_get_uses_cache(db, client, read_env, monkeypatch):
+def test_read_epub_second_get_uses_cache(
+    db: Session,
+    client: TestClient,
+    read_env: tuple[Path, dict[str, str]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     tmp_path, headers = read_env
     uid = "cached"
     _make_epub(tmp_path / f"{uid}.epub")
@@ -547,7 +652,7 @@ def test_read_epub_second_get_uses_cache(db, client, read_env, monkeypatch):
     calls: list[str] = []
     original = EpubConverter.convert
 
-    def counting(self, source, dest_dir):
+    def counting(self: EpubConverter, source: Path, dest_dir: Path) -> Path | None:
         calls.append(source.name)
         return original(self, source, dest_dir)
 
@@ -559,7 +664,9 @@ def test_read_epub_second_get_uses_cache(db, client, read_env, monkeypatch):
     assert len(calls) == 1
 
 
-def test_read_unauthenticated_401(db, client, read_env):
+def test_read_unauthenticated_401(
+    db: Session, client: TestClient, read_env: tuple[Path, dict[str, str]]
+) -> None:
     tmp_path, _ = read_env
     uid = "noauth"
     (tmp_path / f"{uid}.pdf").write_bytes(b"%PDF-1.4 mock")
