@@ -102,7 +102,7 @@ Subagents run in a **child session with their own context**. Their tool output �
      Keep this heading and "## Repository Structure" byte-identical. -->
 ## System Design — Binding Invariants
 
-Six rules. Breaking one requires explicit approval, and you must say which one you are breaking and why. The last column records where the current tree already violates the rule — a known debt, not a licence to add more. The same debt is mirrored, machine-readably, in `[tool.ruff.lint.per-file-ignores]` in `backend/pyproject.toml`; when a module is fixed, delete its row here and its line there in the same commit.
+Six rules. Breaking one requires explicit approval, and you must say which one you are breaking and why. The last column records where the current tree already violates the rule — a known debt, not a licence to add more. The debt is mirrored (plus recorded lint debt), machine-readably, in `[tool.ruff.lint.per-file-ignores]` in `backend/pyproject.toml`; when a module is fixed, delete its row here and its line there in the same commit.
 
 | # | Invariant | Violating today |
 |---|---|---|

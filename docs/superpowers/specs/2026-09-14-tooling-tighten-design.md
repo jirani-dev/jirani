@@ -450,3 +450,13 @@ pointer to the new `AGENTS.md` section lands in the same commit as the section.
 - Renaming the drifted handlers (`get_all_tags`, `get_videos`, `upload_file`) — done when each module is next touched.
 - A CI commit-lint job or branch-name check — the local hooks plus the ruleset are enough at this team size.
 - Media plan Part G (Tasks 11–16).
+
+## 12. Deviations during implementation
+
+Recorded 2026-09-14, after the final whole-branch review (12 commits, base `21634ce`, head of the fix wave):
+
+- **Task 3 (ruff-error cleanup) deferred by the user** — the four pre-existing errors (B904 `dependencies/auth.py:36`, E501 `tag_schema.py:32,35`, UP042 `role_enum.py:4`) plus one new unused `type: ignore` the mypy override created (`tests/media/test_book_cover.py:12`) stay visible until `backend/app/**` becomes `ask` after an opencode restart. §9.2's "→ 0" and §10 item 3 describe work that has not happened yet.
+- **`.github/ai-review-prompt.md` was not left untouched** — §7.3 said unchanged; the branch adds three lines (a worked example finding line) that landed with the rebased polish commit.
+- **§3/§8's "decisions.md #7 owner pointer drops `workflow.md`" was a no-op** — #7 never referenced `workflow.md`; nothing to change.
+- **§9.3's dead-reference grep must target flag forms** — the literal `B008` appears legitimately in `backend/pyproject.toml` (the sanctioned ignore) and in `.superpowers/` scratch; the check is for `--ignore B008` / `--ignore=B008`.
+- **`ci.yml` pytest `-v` removal** happened in the fix wave, not Task 4 (brief miss; found by final review).

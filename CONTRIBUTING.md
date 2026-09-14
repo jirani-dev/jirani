@@ -26,7 +26,7 @@ Expected responses:
 ```
 
 - `type` is one of `feat fix test refactor chore ci docs build perf revert`.
-- `scope` is optional: a module or area — `feat(video): …`, `ci(ai-review): …`.
+- `scope` is optional: a lowercase module or area — `feat(video): …`, `ci(ai-review): …`.
 - `subject`: imperative, **at most 72 characters including the prefix**, no trailing period. A future teammate should guess the diff from it alone.
 - `body`: what and why, wrapped at 72. Optional; expected for anything non-trivial. If you were about to write `feat: X — a, b, c`, put `a, b, c` here.
 - `Merge …`, `Revert "…"`, `fixup! …`, `squash! …` pass automatically.
