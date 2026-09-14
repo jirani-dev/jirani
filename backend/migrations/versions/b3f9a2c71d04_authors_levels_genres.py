@@ -3,8 +3,9 @@
 Revision ID: b3f9a2c71d04
 Revises: 70ee18aafdca  (initial schema)
 """
-from alembic import op
+
 import sqlalchemy as sa
+from alembic import op
 
 revision = "b3f9a2c71d04"
 down_revision = "70ee18aafdca"
@@ -69,18 +70,45 @@ def upgrade() -> None:
     op.drop_column("books", "level")
     op.drop_column("books", "book_type")
 
-    op.create_foreign_key("fk_books_author_id_authors", "books", "authors", ["author_id"], ["id"], ondelete="SET NULL")
-    op.create_foreign_key("fk_books_level_id_levels", "books", "levels", ["level_id"], ["id"], ondelete="SET NULL")
-    op.create_foreign_key("fk_books_genre_id_genres", "books", "genres", ["genre_id"], ["id"], ondelete="SET NULL")
+    op.create_foreign_key(
+        "fk_books_author_id_authors",
+        "books",
+        "authors",
+        ["author_id"],
+        ["id"],
+        ondelete="SET NULL",
+    )
+    op.create_foreign_key(
+        "fk_books_level_id_levels",
+        "books",
+        "levels",
+        ["level_id"],
+        ["id"],
+        ondelete="SET NULL",
+    )
+    op.create_foreign_key(
+        "fk_books_genre_id_genres",
+        "books",
+        "genres",
+        ["genre_id"],
+        ["id"],
+        ondelete="SET NULL",
+    )
 
 
 def downgrade() -> None:
     op.add_column("books", sa.Column("author", sa.String(length=255), nullable=True))
     op.add_column("books", sa.Column("level", sa.String(length=100), nullable=True))
     op.add_column("books", sa.Column("book_type", sa.String(length=100), nullable=True))
-    op.execute("UPDATE books SET author = a.name FROM authors a WHERE a.id = books.author_id")
-    op.execute("UPDATE books SET level = l.name FROM levels l WHERE l.id = books.level_id")
-    op.execute("UPDATE books SET book_type = g.name FROM genres g WHERE g.id = books.genre_id")
+    op.execute(
+        "UPDATE books SET author = a.name FROM authors a WHERE a.id = books.author_id"
+    )
+    op.execute(
+        "UPDATE books SET level = l.name FROM levels l WHERE l.id = books.level_id"
+    )
+    op.execute(
+        "UPDATE books SET book_type = g.name FROM genres g WHERE g.id = books.genre_id"
+    )
     op.drop_constraint("fk_books_author_id_authors", "books", type_="foreignkey")
     op.drop_constraint("fk_books_level_id_levels", "books", type_="foreignkey")
     op.drop_constraint("fk_books_genre_id_genres", "books", type_="foreignkey")

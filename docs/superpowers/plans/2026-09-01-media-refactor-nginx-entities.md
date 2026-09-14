@@ -772,6 +772,10 @@ git commit -m "feat: media domain errors, video extension validator, MediaFileSt
 ### Task 8: Video fused rewrite — 2.0 models, service layer, auth, whitelist, X-Accel
 
 > **Lint/type gate:** `video_router.py` (0/15), `video_repo.py` (0/2), `models/video.py`+`video_tag.py` (0/4 from the 2.0 conversion) end at 0/0.
+>
+> **Approved deviation (user, 2026-09-13):** `Video` adopts `TimestampMixin` for consistency with `Book` — `deleted_at` stays inline (soft-delete state, not audit pair). This supersedes the "identical columns / no migration" claim in the Interfaces below: migration `e7c4b9f2a831` (add `updated_at`, backfill + tighten `created_at` NOT NULL) rides the Step 7 commit — add it to the `git add` list. Red-first pin witnessed: `test_video_timestamps_populated_on_create` (`AttributeError: 'Video' object has no attribute 'updated_at'` → green).
+>
+> **Amendment (user, 2026-09-14): videos hard-delete — full parity with books.** Rationale: one-time deployment device, no soft-delete tracking wanted. This supersedes every soft-delete clause in the Interfaces below: `Video.deleted_at` is DROPPED (migration `e7c4b9f2a831` also drops it), `VideoRepo.soft_delete` becomes `VideoRepo.delete` (missing → raises `MediaNotFound`, mirroring `BookRepo.delete_book`; includes the orphan-tag sweep — pre-implementing Task 12's video half), `VideoService.delete` removes the file via `storage.delete`, router `DELETE` → `204` empty (book parity), `list_active` → `list_all` (no filter — everything in the table is live), and the soft-deleted-stream quirk pin flips to `404`. All flips red-first witnessed.
 
 **Files:**
 - Rewrite: `backend/app/models/video.py`, `video_tag.py` (2.0 conversion — spec §5: inside the fused rewrite)
@@ -807,7 +811,7 @@ return Response(status_code=204, headers={
 
   The router holds no queries, no `open()`, no tag logic. Mapping: `InvalidMediaFile`/`IntegrityError`→400, `MediaNotFound`→404.
 
-- [ ] **Step 1: Write the failing tests / update pins**
+- [x] **Step 1: Write the failing tests / update pins**
 
 **Modify `test_video_api.py`:**
 1. `auth_headers(token)` on every request + parametrized 401 guard (all six paths: `/`, `/upload`, `/upload_multiple`, `/patch`, `/delete`, `/stream`)
@@ -819,15 +823,15 @@ return Response(status_code=204, headers={
 
 **Create `test_media_stream.py`** (video cases): the X-Accel contract rows — 204 + `f"/media/vids/{quote(name)}"` (quoted, per Task 5) for mp4/mov/webm; 404 missing id; 404 missing disk file; 404 traversal-seeded `file_path`; 401 unauthenticated; one **spaced filename** (`"my clip.mp4"`) seeded at `tmp_path` asserting `X-Accel-Redirect == "/media/vids/my%20clip.mp4"` — the regression that guards the encoding. (No audio cases — audio's stream stays the legacy 200-with-body generator, unpinned and untouched.)
 
-- [ ] **Step 2: Verify red** — `cd backend && uv run pytest app/tests/media/test_video_repo.py app/tests/media/test_video_api.py app/tests/media/test_media_stream.py -v`. Expected red, each for the right reason (401 vs legacy 200; `AttributeError` on delete-missing; both rows surviving the bad batch; `FileNotFoundError`; 200-with-body vs 204 asserts; `test_media_stream.py` collection ERROR on the missing `video_service` module — correct red for a new module). Everything else green.
+- [x] **Step 2: Verify red** — `cd backend && uv run pytest app/tests/media/test_video_repo.py app/tests/media/test_video_api.py app/tests/media/test_media_stream.py -v`. Expected red, each for the right reason (401 vs legacy 200; `AttributeError` on delete-missing; both rows surviving the bad batch; `FileNotFoundError`; 200-with-body vs 204 asserts; `test_media_stream.py` collection ERROR on the missing `video_service` module — correct red for a new module). Everything else green.
 
-- [ ] **Step 3: Convert the models to 2.0** per Interfaces (identical columns). Evidence of neutrality: `cd backend && uv run pytest app/tests/media/test_video_repo.py app/tests/media/test_video_api.py -v` — the unflipped pins stay green; only the deliberate Step-1 flips stay red. No migration — zero schema delta.
+- [x] **Step 3: Convert the models to 2.0** per Interfaces (identical columns). Evidence of neutrality: `cd backend && uv run pytest app/tests/media/test_video_repo.py app/tests/media/test_video_api.py -v` — the unflipped pins stay green; only the deliberate Step-1 flips stay red. No migration — zero schema delta.
 
-- [ ] **Step 4: Implement** — schemas renames → repo → service → router per Interfaces; add `VideoRepo` to `repositories/__init__.py`.
+- [x] **Step 4: Implement** — schemas renames → repo → service → router per Interfaces; add `VideoRepo` to `repositories/__init__.py`.
 
-- [ ] **Step 5: Verify green** — `cd backend && uv run pytest app/tests/media/test_video_repo.py app/tests/media/test_video_api.py app/tests/media/test_media_stream.py -v`. Expected: all pass.
+- [x] **Step 5: Verify green** — `cd backend && uv run pytest app/tests/media/test_video_repo.py app/tests/media/test_video_api.py app/tests/media/test_media_stream.py -v`. Expected: all pass.
 
-- [ ] **Step 6: Format, lint, type**
+- [x] **Step 6: Format, lint, type**
 
 ```bash
 cd backend && uv run ruff format app/models/video.py app/models/video_tag.py app/repositories/video_repo.py app/services/video_service.py app/api/video_router.py app/schemas/video_schema.py app/repositories/__init__.py app/tests/media/test_video_api.py app/tests/media/test_video_repo.py app/tests/media/test_media_stream.py && uv run ruff check app/models/video.py app/models/video_tag.py app/repositories/video_repo.py app/services/video_service.py app/api/video_router.py app/schemas/video_schema.py app/repositories/__init__.py app/tests/media/test_video_api.py app/tests/media/test_video_repo.py app/tests/media/test_media_stream.py --ignore B008 && uv run mypy app/models/video.py app/models/video_tag.py app/repositories/video_repo.py app/services/video_service.py app/api/video_router.py app/schemas/video_schema.py app/repositories/__init__.py --strict
@@ -835,7 +839,7 @@ cd backend && uv run ruff format app/models/video.py app/models/video_tag.py app
 
 Expected: 0/0 (Annex video rows struck).
 
-- [ ] **Step 7: Commit** (one commit — the fused rewrite is one unit, models included)
+- [x] **Step 7: Commit** (one commit — the fused rewrite is one unit, models included)
 
 ```bash
 git add backend/app/models/video.py backend/app/models/video_tag.py backend/app/repositories/video_repo.py backend/app/services/video_service.py backend/app/api/video_router.py backend/app/schemas/video_schema.py backend/app/repositories/__init__.py backend/app/tests/media/test_video_api.py backend/app/tests/media/test_video_repo.py backend/app/tests/media/test_media_stream.py

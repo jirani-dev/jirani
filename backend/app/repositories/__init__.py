@@ -4,5 +4,14 @@ from .book_repo import BookRepo
 from .genre_repo import GenreRepo
 from .level_repo import LevelRepo
 from .tag_repo import TagRepo
+from .video_repo import VideoRepo
 
-__all__ = ["AuthRepo", "AuthorRepo", "BookRepo", "GenreRepo", "LevelRepo", "TagRepo"]
+__all__ = [
+    "AuthRepo",
+    "AuthorRepo",
+    "BookRepo",
+    "GenreRepo",
+    "LevelRepo",
+    "TagRepo",
+    "VideoRepo",
+]

@@ -1,9 +1,13 @@
+import mimetypes
+from urllib.parse import quote
+
 import pytest
 
 import app.api.video_router as video_router_module
+from app.config import settings
 from app.models.tag import Tag
 from app.models.video import Video
-from app.repositories.video_repo import Video_Repo
+from app.tests.conftest import auth_headers, login, setup_admin
 
 
 def _seed_video(
@@ -16,30 +20,48 @@ def _seed_video(
     return vid
 
 
-def test_get_videos_empty(client):
-    response = client.get("/videos/")
+def _patch_video_dir(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+    # The legacy router reads VIDS_DIR at import time; the fused router reads
+    # settings.VIDEO_DIR at request time. Patch both to a tmp_path subdir so
+    # the same location is used before and after the rewrite (raising=False
+    # keeps Step 5 green once the legacy VIDS_DIR constant is gone). The subdir
+    # keeps the setup flow's .credentials files out of the file-count asserts.
+    video_dir = tmp_path / "vids"
+    video_dir.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(settings, "VIDEO_DIR", video_dir)
+    monkeypatch.setattr(video_router_module, "VIDS_DIR", video_dir, raising=False)
+
+
+@pytest.fixture()
+def auth(client, setup_paths) -> dict[str, str]:
+    admin_pw = setup_admin(client, setup_paths)
+    token = login(client, "admin", admin_pw)["access_token"]
+    return auth_headers(token)
+
+
+def test_get_videos_empty(client, auth):
+    response = client.get("/videos/", headers=auth)
     assert response.status_code == 200
     assert response.json() == []
 
 
-def test_get_videos_excludes_soft_deleted(db, client):
-    a = _seed_video(db, title="a")
-    b = _seed_video(db, title="b")
-    Video_Repo(db).delete_video(a.id)
-    db.expire_all()
-    response = client.get("/videos/")
+def test_get_videos_lists_all(db, client, auth):
+    _seed_video(db, title="a")
+    _seed_video(db, title="b")
+    response = client.get("/videos/", headers=auth)
     assert response.status_code == 200
-    assert {item["id"] for item in response.json()} == {b.id}
+    assert len(response.json()) == 2
 
 
-def test_upload_happy(db, client, monkeypatch, tmp_path):
-    monkeypatch.setattr(video_router_module, "VIDS_DIR", tmp_path)
+def test_upload_happy(db, client, monkeypatch, tmp_path, auth):
+    _patch_video_dir(monkeypatch, tmp_path)
     response = client.post(
         "/videos/upload",
         files={
             "file": ("clip.mp4", b"\x00\x00\x00\x18ftypmp42 mock bytes", "video/mp4")
         },
         data={"title": "Intro", "description": "first", "tags": "lesson"},
+        headers=auth,
     )
     assert response.status_code == 200
     body = response.json()
@@ -49,42 +71,45 @@ def test_upload_happy(db, client, monkeypatch, tmp_path):
     assert len(body["tags"]) == 1
     assert body["tags"][0]["name"] == "lesson"
     assert body["tags"][0]["id"] is not None
-    files_on_disk = [p for p in tmp_path.iterdir() if p.is_file()]
+    files_on_disk = [p for p in (tmp_path / "vids").iterdir() if p.is_file()]
     assert len(files_on_disk) == 1
     assert files_on_disk[0].read_bytes() == b"\x00\x00\x00\x18ftypmp42 mock bytes"
     db.expire_all()
     row = db.query(Video).filter(Video.id == body["id"]).first()
     assert row is not None
-    assert row.file_path == str(files_on_disk[0])
 
 
-def test_upload_missing_title_returns_422(client, monkeypatch, tmp_path):
-    monkeypatch.setattr(video_router_module, "VIDS_DIR", tmp_path)
+def test_upload_missing_title_returns_422(client, monkeypatch, tmp_path, auth):
+    _patch_video_dir(monkeypatch, tmp_path)
     response = client.post(
         "/videos/upload",
         files={"file": ("clip.mp4", b"bytes", "video/mp4")},
+        headers=auth,
     )
     assert response.status_code == 422
 
 
-def test_upload_txt_still_succeeds_quirk(client, monkeypatch, tmp_path):
-    monkeypatch.setattr(video_router_module, "VIDS_DIR", tmp_path)
+def test_upload_txt_rejected_400(client, monkeypatch, tmp_path, auth):
+    _patch_video_dir(monkeypatch, tmp_path)
     response = client.post(
         "/videos/upload",
         files={"file": ("notes.txt", b"hello", "text/plain")},
         data={"title": "Notes"},
+        headers=auth,
     )
-    # Quirk pin: no extension validation exists. Task 8 flips this to 400.
-    assert response.status_code == 200
-    assert response.json()["title"] == "Notes"
+    assert response.status_code == 400
+    assert response.json()["detail"] == "File type .txt not allowed"
 
 
-def test_upload_tags_whitespace_first_seen_reused(db, client, monkeypatch, tmp_path):
-    monkeypatch.setattr(video_router_module, "VIDS_DIR", tmp_path)
+def test_upload_tags_whitespace_first_seen_reused(
+    db, client, monkeypatch, tmp_path, auth
+):
+    _patch_video_dir(monkeypatch, tmp_path)
     response = client.post(
         "/videos/upload",
         files={"file": ("clip.mp4", b"bytes", "video/mp4")},
         data={"title": "T", "tags": " MATH , math "},
+        headers=auth,
     )
     assert response.status_code == 200
     body = response.json()
@@ -95,16 +120,17 @@ def test_upload_tags_whitespace_first_seen_reused(db, client, monkeypatch, tmp_p
     assert db.query(Tag).count() == 1
 
 
-def test_upload_tag_reuses_preexisting_row(db, client, monkeypatch, tmp_path):
+def test_upload_tag_reuses_preexisting_row(db, client, monkeypatch, tmp_path, auth):
     tag = Tag(name="math")
     db.add(tag)
     db.commit()
     db.refresh(tag)
-    monkeypatch.setattr(video_router_module, "VIDS_DIR", tmp_path)
+    _patch_video_dir(monkeypatch, tmp_path)
     response = client.post(
         "/videos/upload",
         files={"file": ("clip.mp4", b"bytes", "video/mp4")},
         data={"title": "T", "tags": "math"},
+        headers=auth,
     )
     assert response.status_code == 200
     body = response.json()
@@ -115,14 +141,15 @@ def test_upload_tag_reuses_preexisting_row(db, client, monkeypatch, tmp_path):
     assert db.query(Tag).count() == 1
 
 
-def test_upload_multiple_valid_pair(client, monkeypatch, tmp_path):
-    monkeypatch.setattr(video_router_module, "VIDS_DIR", tmp_path)
+def test_upload_multiple_valid_pair(client, monkeypatch, tmp_path, auth):
+    _patch_video_dir(monkeypatch, tmp_path)
     response = client.post(
         "/videos/upload_multiple",
         files=[
             ("files", ("a.mp4", b"bytes-a", "video/mp4")),
             ("files", ("b.mp4", b"bytes-b", "video/mp4")),
         ],
+        headers=auth,
     )
     assert response.status_code == 200
     body = response.json()
@@ -131,28 +158,30 @@ def test_upload_multiple_valid_pair(client, monkeypatch, tmp_path):
     assert all(item["tags"] == [] for item in body)
 
 
-def test_upload_multiple_txt_second_still_commits(db, client, monkeypatch, tmp_path):
-    monkeypatch.setattr(video_router_module, "VIDS_DIR", tmp_path)
+def test_upload_multiple_partial_commit_leaves_nothing(
+    db, client, monkeypatch, tmp_path, auth
+):
+    _patch_video_dir(monkeypatch, tmp_path)
     response = client.post(
         "/videos/upload_multiple",
         files=[
             ("files", ("a.mp4", b"bytes-a", "video/mp4")),
             ("files", ("notes.txt", b"hello", "text/plain")),
         ],
+        headers=auth,
     )
-    assert response.status_code == 200
-    body = response.json()
-    assert len(body) == 2
+    assert response.status_code == 400
     db.expire_all()
-    # Quirk pin: no validation = no failure. Task 8's probe flips this.
-    assert db.query(Video).count() == 2
+    assert client.get("/videos/", headers=auth).json() == []
+    assert list((tmp_path / "vids").iterdir()) == []
 
 
-def test_patch_title_description_tags_replace(db, client):
+def test_patch_title_description_tags_replace(db, client, auth):
     vid = _seed_video(db)
     response = client.patch(
         f"/videos/{vid.id}",
         params={"title": "New", "description": "desc", "tags": "x, y"},
+        headers=auth,
     )
     assert response.status_code == 200
     db.expire_all()
@@ -163,7 +192,7 @@ def test_patch_title_description_tags_replace(db, client):
     assert sorted(tag.name for tag in row.tags) == ["x", "y"]
 
 
-def test_patch_empty_tags_clears_but_keeps_tag_rows(db, client):
+def test_patch_empty_tags_clears_but_keeps_tag_rows(db, client, auth):
     vid = _seed_video(db)
     tag = Tag(name="lesson")
     db.add(tag)
@@ -171,7 +200,7 @@ def test_patch_empty_tags_clears_but_keeps_tag_rows(db, client):
     vid.tags.append(tag)
     db.commit()
     tag_id = tag.id
-    response = client.patch(f"/videos/{vid.id}", params={"tags": ""})
+    response = client.patch(f"/videos/{vid.id}", params={"tags": ""}, headers=auth)
     assert response.status_code == 200
     assert response.json()["tags"] == []
     db.expire_all()
@@ -181,9 +210,11 @@ def test_patch_empty_tags_clears_but_keeps_tag_rows(db, client):
     assert db.query(Tag).filter(Tag.id == tag_id).one().name == "lesson"
 
 
-def test_patch_omitted_fields_unchanged(db, client):
+def test_patch_omitted_fields_unchanged(db, client, auth):
     vid = _seed_video(db, title="Keep")
-    response = client.patch(f"/videos/{vid.id}", params={"description": "changed"})
+    response = client.patch(
+        f"/videos/{vid.id}", params={"description": "changed"}, headers=auth
+    )
     assert response.status_code == 200
     db.expire_all()
     row = db.query(Video).filter(Video.id == vid.id).first()
@@ -193,59 +224,97 @@ def test_patch_omitted_fields_unchanged(db, client):
     assert row.tags == []
 
 
-def test_patch_missing_video_404(client):
-    response = client.patch("/videos/999999", params={"title": "x"})
+def test_patch_missing_video_404(client, auth):
+    response = client.patch("/videos/999999", params={"title": "x"}, headers=auth)
     assert response.status_code == 404
     assert response.json()["detail"] == "Video not found"
 
 
-def test_delete_video_soft_deletes_via_api(db, client):
-    vid = _seed_video(db)
-    response = client.delete(f"/videos/{vid.id}")
-    assert response.status_code == 200
-    body = response.json()
-    assert "id" in body
-    assert "title" in body
-    assert body["deleted_at"] is not None
+def test_delete_video_deletes_via_api(db, client, monkeypatch, tmp_path, auth):
+    _patch_video_dir(monkeypatch, tmp_path)
+    video_file = tmp_path / "vids" / "clip.mp4"
+    video_file.write_bytes(b"\x00\x01\x02\x03" * 100)
+    vid = _seed_video(db, file_path=str(video_file))
+    response = client.delete(f"/videos/{vid.id}", headers=auth)
+    assert response.status_code == 204
+    assert response.content == b""
     db.expire_all()
-    assert db.query(Video).count() == 1
-    assert client.get("/videos/").json() == []
+    assert db.query(Video).count() == 0
+    assert client.get("/videos/", headers=auth).json() == []
+    assert not video_file.exists()
 
 
-def test_delete_missing_video_raises_attribute_error(client):
-    with pytest.raises(AttributeError):
-        client.delete("/videos/999999")
-
-
-def test_stream_serves_bytes_byte_for_byte(db, client, tmp_path):
-    file_bytes = b"\x00\x01\x02\x03" * 1000
-    video_file = tmp_path / "clip.mp4"
-    video_file.write_bytes(file_bytes)
-    vid = _seed_video(db, file_path=str(video_file))
-    response = client.get(f"/videos/stream/{vid.id}")
-    assert response.status_code == 200
-    assert response.headers["content-type"] == "video/mp4"
-    assert response.content == file_bytes
-
-
-def test_stream_missing_video_404(client):
-    response = client.get("/videos/stream/999999")
+def test_delete_missing_video_404(client, auth):
+    response = client.delete("/videos/999999", headers=auth)
     assert response.status_code == 404
     assert response.json()["detail"] == "Video not found"
 
 
-def test_stream_soft_deleted_still_streams_quirk(db, client, tmp_path):
+def test_stream_serves_x_accel_204(db, client, monkeypatch, tmp_path, auth):
+    _patch_video_dir(monkeypatch, tmp_path)
     file_bytes = b"\x00\x01\x02\x03" * 1000
-    video_file = tmp_path / "clip.mp4"
+    video_file = tmp_path / "vids" / "clip.mp4"
     video_file.write_bytes(file_bytes)
     vid = _seed_video(db, file_path=str(video_file))
-    Video_Repo(db).delete_video(vid.id)
-    response = client.get(f"/videos/stream/{vid.id}")
-    assert response.status_code == 200
-    assert response.content == file_bytes
+    response = client.get(f"/videos/stream/{vid.id}", headers=auth)
+    assert response.status_code == 204
+    assert response.content == b""
+    assert response.headers["X-Accel-Redirect"] == f"/media/vids/{quote('clip.mp4')}"
+    assert response.headers["Content-Type"] == mimetypes.guess_type("clip.mp4")[0]
+    assert response.headers["Accept-Ranges"] == "bytes"
 
 
-def test_stream_missing_file_raises(db, client, tmp_path):
-    vid = _seed_video(db, file_path=str(tmp_path / "gone.mp4"))
-    with pytest.raises(FileNotFoundError):
-        client.get(f"/videos/stream/{vid.id}")
+def test_stream_missing_video_404(client, auth):
+    response = client.get("/videos/stream/999999", headers=auth)
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Video not found"
+
+
+def test_stream_deleted_video_404(db, client, monkeypatch, tmp_path, auth):
+    _patch_video_dir(monkeypatch, tmp_path)
+    file_bytes = b"\x00\x01\x02\x03" * 1000
+    video_file = tmp_path / "vids" / "clip.mp4"
+    video_file.write_bytes(file_bytes)
+    vid = _seed_video(db, file_path=str(video_file))
+    client.delete(f"/videos/{vid.id}", headers=auth)
+    response = client.get(f"/videos/stream/{vid.id}", headers=auth)
+    assert response.status_code == 404
+
+
+def test_stream_missing_file_404(db, client, monkeypatch, tmp_path, auth):
+    _patch_video_dir(monkeypatch, tmp_path)
+    vid = _seed_video(db, file_path=str(tmp_path / "vids" / "gone.mp4"))
+    response = client.get(f"/videos/stream/{vid.id}", headers=auth)
+    assert response.status_code == 404
+
+
+@pytest.mark.parametrize(
+    "method, path, kwargs",
+    [
+        ("get", "/videos/", {}),
+        (
+            "post",
+            "/videos/upload",
+            {
+                "files": {"file": ("clip.mp4", b"bytes", "video/mp4")},
+                "data": {"title": "T"},
+            },
+        ),
+        (
+            "post",
+            "/videos/upload_multiple",
+            {"files": [("files", ("a.mp4", b"bytes", "video/mp4"))]},
+        ),
+        ("patch", "/videos/{id}", {"params": {"title": "x"}}),
+        ("delete", "/videos/{id}", {}),
+        ("get", "/videos/stream/{id}", {}),
+    ],
+)
+def test_all_video_endpoints_require_auth(
+    db, client, monkeypatch, tmp_path, method, path, kwargs
+):
+    _patch_video_dir(monkeypatch, tmp_path)
+    (tmp_path / "vids" / "clip.mp4").write_bytes(b"\x00\x01\x02\x03" * 100)
+    vid = _seed_video(db, file_path=str(tmp_path / "vids" / "clip.mp4"))
+    response = getattr(client, method)(path.format(id=vid.id), **kwargs)
+    assert response.status_code == 401
