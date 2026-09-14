@@ -1,9 +1,5 @@
-import pytest
-from sqlalchemy.exc import IntegrityError
-
 from app.models import Tag
 from app.repositories.tag_repo import TagRepo
-from app.schemas.tag_schema import TagCreate
 
 
 def _seed_tag(db, name: str) -> Tag:
@@ -23,16 +19,27 @@ def test_get_all_tags_returns_seeded_rows(db):
     assert len(rows) == 3
 
 
-def test_get_tag_by_id_returns_row_or_none(db):
-    seeded = _seed_tag(db, "math")
-    row = TagRepo(db).get_tag_by_id(seeded.id)
-    assert row.name == "math"
-    assert TagRepo(db).get_tag_by_id(999999) is None
+def test_get_or_create_by_names_reuses_stored_case(db):
+    _seed_tag(db, "Math")
+    rows = TagRepo(db).get_or_create_by_names(["  MATH "])
+    assert [t.name for t in rows] == ["Math"]
 
 
-def test_create_tag_normalizes_whitespace_and_enforces_unique(db):
-    created = TagRepo(db).create_tag(TagCreate(name="  Math  "))
-    assert created.name == "Math"
-    assert created.id is not None
-    with pytest.raises(IntegrityError):
-        TagRepo(db).create_tag(TagCreate(name="Math"))
+def test_get_or_create_by_names_creates_missing_lowercased(db):
+    rows = TagRepo(db).get_or_create_by_names(["  Sci-Fi ", "MATH"])
+    assert [t.name for t in rows] == ["sci-fi", "math"]
+
+
+def test_get_or_create_by_names_collapses_duplicates_in_first_seen_order(db):
+    _seed_tag(db, "math")
+    rows = TagRepo(db).get_or_create_by_names(["MATH", "math", "  MATH  "])
+    assert [t.name for t in rows] == ["math"]
+
+
+def test_get_or_create_by_names_empty_returns_empty(db):
+    assert TagRepo(db).get_or_create_by_names([]) == []
+
+
+def test_get_or_create_by_names_skips_blank_names(db):
+    rows = TagRepo(db).get_or_create_by_names(["  ", "math"])
+    assert [t.name for t in rows] == ["math"]

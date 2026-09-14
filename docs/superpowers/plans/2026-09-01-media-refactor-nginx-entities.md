@@ -703,16 +703,16 @@ git commit -m "refactor: book model on author/level/genre FKs, X-Accel stream, t
 - `TagService(db: Session)` with `list_tags() -> list[TagRead]`
 - Router: `GET /tags/` keeps prefix + response model; gains `Depends(RoleChecker([admin, teacher, student]))`; calls the service; holds **no** queries
 
-- [ ] **Step 1: Update Part A pins + never-test red**
+- [x] **Step 1: Update Part A pins + never-test red**
   - `test_tag_api.py`: wrap every `get("/tags/")` in `headers=auth_headers(token)`; add unauthenticated → `401` probe
   - `test_tag_repo.py`: delete the `get_tag_by_id` cases and the unique-constraint case (dead-method pins)
   - Run: `cd backend && uv run pytest app/tests/media/test_tag_api.py -v`. Expected: the 401 probe **fails** (legacy returns 200 — red for the right reason); the 200 cases now 401 too (they lack headers until Step 3's rewrite — acceptable, same red)
 
-- [ ] **Step 2: Implement** — repo, service, router per Interfaces.
+- [x] **Step 2: Implement** — repo, service, router per Interfaces.
 
-- [ ] **Step 3: Verify green** — `cd backend && uv run pytest app/tests/media/test_tag_repo.py app/tests/media/test_tag_api.py -v`. Expected: all pass including 401.
+- [x] **Step 3: Verify green** — `cd backend && uv run pytest app/tests/media/test_tag_repo.py app/tests/media/test_tag_api.py -v`. Expected: all pass including 401.
 
-- [ ] **Step 4: Format, lint, type**
+- [x] **Step 4: Format, lint, type**
 
 ```bash
 cd backend && uv run ruff format app/repositories/tag_repo.py app/services/tag_service.py app/api/tag_router.py app/tests/media/test_tag_repo.py app/tests/media/test_tag_api.py && uv run ruff check app/repositories/tag_repo.py app/services/tag_service.py app/api/tag_router.py app/tests/media/test_tag_repo.py app/tests/media/test_tag_api.py --ignore B008 && uv run mypy app/repositories/tag_repo.py app/services/tag_service.py app/api/tag_router.py app/models/tag.py --strict
@@ -720,7 +720,7 @@ cd backend && uv run ruff format app/repositories/tag_repo.py app/services/tag_s
 
 Expected: 0/0 (Annex tag rows struck).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/app/repositories/tag_repo.py backend/app/services/tag_service.py backend/app/api/tag_router.py backend/app/models/tag.py backend/app/tests/media/test_tag_repo.py backend/app/tests/media/test_tag_api.py
