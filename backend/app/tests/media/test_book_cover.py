@@ -9,7 +9,7 @@ from app.services.cover_generator import CoverGenerator
 
 
 def _write_real_pdf(path: Path) -> None:
-    doc = pymupdf.open()  # type: ignore[no-untyped-call]
+    doc = pymupdf.open()
     page = doc.new_page()
     page.insert_text((72, 72), "Hello cover")
     doc.save(str(path))
