@@ -1020,7 +1020,7 @@ git commit -m "feat: nginx front proxy — X-Accel media, public covers, /api ro
 
 **Why (learning):** a refactor plan is done when the DoD has actually run, the old artifacts can no longer be executed by accident (the `plan-auditor` reads both plan trees — stale plans with fresh checkboxes is how drift happens), the docs point at the one true plan, and the backend contract is frozen for React (§9). Deleting superseded docs is a contribution; git history is the archive (AGENTS.md). Note for this task: `frontend/` already exists in the tree (TypeScript + Vite, landed 2026-09-01, ahead of this plan closing) — the annex records actual decisions and current facts, not wishes.
 
-- [ ] **Step 1: Write the React kickoff annex** — create `docs/superpowers/specs/react-kickoff-annex.md` with this content:
+- [x] **Step 1: Write the React kickoff annex** — create `docs/superpowers/specs/react-kickoff-annex.md` with this content:
 
 ```markdown
 # React Kickoff Annex — SPA integration decisions (2026-09-01)
@@ -1086,7 +1086,7 @@ The backend contract below is frozen; React pins to it.
 - URL prefixes: `/api/`, `/media/` (internal-only), `/static/covers/` (public).
 ```
 
-- [ ] **Step 2: Full DoD sweep**
+- [x] **Step 2: Full DoD sweep**
 
 ```bash
 cd backend && uv run ruff format . && uv run ruff check . --fix --ignore B008 && uv run pytest -v
@@ -1094,7 +1094,7 @@ cd backend && uv run ruff format . && uv run ruff check . --fix --ignore B008 &&
 
   Expected: format clean; ruff shows only ledger rows owned by remaining hygiene/audio debt — if `--fix` touches a file outside this plan's map, include it in the commit and note it; full suite green (auth, video, tag, entity, book ×3, media leaf files).
 
-- [ ] **Step 3: mypy --strict on every file this plan touched**
+- [x] **Step 3: mypy --strict on every file this plan touched**
 
 ```bash
 cd backend && uv run mypy app/models/author.py app/models/level.py app/models/genre.py app/models/book.py app/models/video.py app/models/video_tag.py app/models/tag.py app/schemas/author_schema.py app/schemas/level_schema.py app/schemas/genre_schema.py app/schemas/book_schema.py app/schemas/video_schema.py app/repositories/author_repo.py app/repositories/level_repo.py app/repositories/genre_repo.py app/repositories/book_repo.py app/repositories/video_repo.py app/repositories/tag_repo.py app/repositories/__init__.py app/services/author_service.py app/services/level_service.py app/services/genre_service.py app/services/book_service.py app/services/video_service.py app/services/tag_service.py app/services/book_errors.py app/services/content_validator.py app/services/book_file_storage.py app/services/epub_metadata_reader.py app/services/cover_generator.py app/services/media_errors.py app/services/media_validator.py app/services/media_file_storage.py app/api/author_router.py app/api/level_router.py app/api/genre_router.py app/api/book_router.py app/api/video_router.py app/api/tag_router.py app/main.py --strict
@@ -1102,27 +1102,27 @@ cd backend && uv run mypy app/models/author.py app/models/level.py app/models/ge
 
   Expected: 0 errors — the Annex fully struck for this plan. **Audio files are deliberately absent** — their rows belong to the future audio plan. Do **not** run `mypy . --strict` as a gate; auth/config/database/audio files remain other plans' rows.
 
-- [ ] **Step 4: Bug-inventory sweep** — `cd backend && grep -rn "uploads/vids\|uploads/audio" app/ --include='*.py' | grep -v tests` → no matches in this plan's touched files (no CWD-relative literals remain there — audio's literal is out of scope and may still match); `grep -rn "print(" app/services/ app/api/` → no matches in the touched files (legacy audio lines may match — out of scope), i.e. verify none of the touched files added any.
+- [x] **Step 4: Bug-inventory sweep** — `cd backend && grep -rn "uploads/vids\|uploads/audio" app/ --include='*.py' | grep -v tests` → no matches in this plan's touched files (no CWD-relative literals remain there — audio's literal is out of scope and may still match); `grep -rn "print(" app/services/ app/api/` → no matches in the touched files (legacy audio lines may match — out of scope), i.e. verify none of the touched files added any.
 
-- [ ] **Step 5: `/done`** — dispatches `invariant-auditor` then `verifier` over the accumulated diff in one gate. On PASS proceed; a VIOLATION or failed run is a failed gate.
+- [x] **Step 5: `/done`** — dispatches `invariant-auditor` then `verifier` over the accumulated diff in one gate. On PASS proceed; a VIOLATION or failed run is a failed gate.
 
-- [ ] **Step 6: Delete the superseded artifacts**
+- [x] **Step 6: Delete the superseded artifacts**
 
 ```bash
 git rm docs/superpowers/plans/2026-08-16-book-refactor.md docs/superpowers/plans/2026-08-26-audio-video-tag-refactor.md docs/superpowers/specs/2026-08-16-book-refactor-design.md
 ```
 
-- [ ] **Step 7: Update `AGENTS.md` references** (requires explicit user go-ahead — this file is the repo's contract)
+- [x] **Step 7: Update `AGENTS.md` references** (requires explicit user go-ahead — this file is the repo's contract)
   1. "Two plans are in flight" becomes `2026-08-15-codebase-hygiene` alone; the media refactor plan's main pass is **complete** — its Part G follow-ons (Tasks 11–16) remain open and are listed in STATE.md
   2. Any "book-refactor plan Task X is the reference pattern" wording → "the 2026-09-01 media refactor plan's Task 5" (the pattern survives, the file does not)
   3. The six-invariant "Violating today" column — book/video/tag rows are struck (layering, CWD-relative paths, 2.0, tests, naming). The **audio rows stay** (audio_router inline DB + tag logic, `Audio_Repo` naming, zero tests, CWD literal, Python streaming) with a pointer at the deferred audio plan; `/auth/reset-password` 500 stays if still true
   4. Add the `frontend/` convention note (per the annex's last bullet)
 
-- [ ] **Step 8: Update README + STATE**
+- [x] **Step 8: Update README + STATE**
 
   README "Notes" gains: media is served by nginx (`docker compose up -d --build` brings it up; API at `/api/*`; protected media via X-Accel — never expose `/media/`). Troubleshooting entry: if API calls return 502 after a `backend` container restart, `docker compose restart nginx` — nginx caches the upstream's IP at startup and must be re-resolved. *(If README.md edits are outside your write permissions, put the exact sentences in a chat message for the user to paste.)* Then invoke the `state` skill: record the completed main pass, log the surviving annex rows (hygiene + audio debt), note the media-unreachable-without-nginx dev behavior and the loud zero-auth `/audio/` warning, and list the Part G follow-ons (Tasks 11–16) + the audio deferral as open items.
 
-- [ ] **Step 9: Refresh the knowledge graph + final commit**
+- [x] **Step 9: Refresh the knowledge graph + final commit**
 
 ```bash
 graphify update .

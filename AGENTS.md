@@ -156,12 +156,12 @@ Six rules. Breaking one requires explicit approval, and you must say which one y
 
 | # | Invariant | Violating today |
 |---|---|---|
-| 1 | **Layering:** router → service → repository → model. Routers never open a session or query directly. Repositories never raise `HTTPException`. Business rules live in services. | `audio_router`, `video_router`, `tag_router` — inline DB access and tag logic, no service layer |
+| 1 | **Layering:** router → service → repository → model. Routers never open a session or query directly. Repositories never raise `HTTPException`. Business rules live in services. | `audio_router` — inline DB access and tag logic, no service layer *(video/tag closed by media plan Tasks 6/8, 2026-09-13/14; audio deferred to its own future plan)* |
 | 2 | **Error mapping:** services raise domain exceptions; **only routers** translate them. `ValueError`→400, `PermissionError`→403, not-found→404, `IntegrityError`→400. The same rule returns the same status on every endpoint. | — (closed by hygiene A2, 2026-08-26) |
 | 3 | **No CWD-relative file I/O.** Every filesystem path derives from `app/config.py` settings anchored to `BASE_DIR`. Never a bare relative string. | — (closed by hygiene S3; routers read `settings.AUDIO_DIR`/`VIDEO_DIR`, `config.py:42-43`) |
-| 4 | **SQLAlchemy 2.0** (`Mapped[]`, `mapped_column`, `select()`) in all new or modified code. Legacy 1.x is grandfathered only until its module gets tests. | `Audio`/`Video` models and join tables; `BookRepo`, `TagRepo` still use `query()` |
-| 5 | **Tests run on PostgreSQL** via testcontainers — never SQLite (JSONB/GIN are not expressible there). Never delete a failing test to go green. Write characterization tests before refactoring untested code. TDD per the Test-Driven Development section: characterization first on legacy code, red-green-refactor for new behavior and bugfixes. | book, audio, video, tag modules have zero tests |
-| 6 | **Naming:** `PascalCase` classes with no underscores; `snake_case` for functions and modules. | `Audio_Repo`, `Video_Repo`, `Audio_Create`, `Video_Create` |
+| 4 | **SQLAlchemy 2.0** (`Mapped[]`, `mapped_column`, `select()`) in all new or modified code. Legacy 1.x is grandfathered only until its module gets tests. | `Audio`/`AudioTag` models; `AudioRepo` still uses `query()` *(video/book/tag closed by media plan Tasks 5/6/8)* |
+| 5 | **Tests run on PostgreSQL** via testcontainers — never SQLite (JSONB/GIN are not expressible there). Never delete a failing test to go green. Write characterization tests before refactoring untested code. TDD per the Test-Driven Development section: characterization first on legacy code, red-green-refactor for new behavior and bugfixes. | audio module has zero tests *(book/video/tag covered by media plan Tasks 5/6/8)* |
+| 6 | **Naming:** `PascalCase` classes with no underscores; `snake_case` for functions and modules. | `Audio_Repo`, `Audio_Create`, `Audio_View` *(video rows closed by media plan Task 8)* |
 
 ## Repository Structure
 
@@ -184,6 +184,8 @@ Where things go:
 - **New model** → define it, then export it from `models/__init__.py`, or `Base.metadata` will not see it and Alembic will generate a `drop_table` for it.
 - **Cross-module helper** → a service. Do not create a `utils` grab-bag.
 - **Plans and specs** → `docs/superpowers/plans/`, `docs/superpowers/specs/`. See "Plans and Specs" below for the one tree.
+
+`frontend/` (TypeScript + Vite SPA) lives on the **`frontend` branch** (scaffold landed 2026-09-01, moved off this tree in `358bb45`; merged back when the React track starts): it pins to the frozen backend contract in `docs/superpowers/specs/react-kickoff-annex.md` — response shapes may gain fields, never lose or rename them; API calls go through the same-origin nginx (`/api/*`); media via `/static/covers/` (public) and blob-URL fetches for protected streams. Backend advisory boundaries in this file are unchanged by frontend work.
 
 ## Best Practices
 
@@ -225,7 +227,7 @@ not skip the pin to "get going"; a refactor without it silently drops behavior
 you did not know existed.
 
 **Plans are written red-green.** Every plan task that produces code has the
-book-refactor shape: write failing test → run and record the red output →
+media-refactor shape: write failing test → run and record the red output →
 implement → run and record green → lint/type → commit. The reference pattern is
 Task 5 of the media refactor plan
 (`docs/superpowers/plans/2026-09-01-media-refactor-nginx-entities.md`) — a fused
@@ -294,4 +296,4 @@ One tree only: `docs/superpowers/plans/` and `docs/superpowers/specs/`. All new 
 
 The older `docs/plans/` and `docs/specs/` trees were deleted on 2026-08-16 — the auth work was fully committed. The book-refactor and audio-video-tag refactors were then superseded on 2026-09-01 by `docs/superpowers/specs/2026-09-01-media-refactor-nginx-entities-design.md` + its plan; the media plan's Task 10 deletes those older files. Recover any deleted plan from git history (`git log --follow -- docs/plans/<file>` or `docs/superpowers/plans/<file>`) if ever needed; do not recreate the tree.
 
-The hygiene plan `2026-08-15-codebase-hygiene` is **complete** (74/74 boxes, git-verified 2026-09-01; S1–S6 + Part B A1–A4). It is no longer in flight — its debt ledger is historical; read it only for the invariant-table context. The one plan in flight is `2026-09-01-media-refactor-nginx-entities` (books/video refactor + nginx X-Accel + author/level/genre entities + Part G follow-ons; audio deferred to its own future plan). `2026-05-26-monorepo-restructure` is largely complete. The `2026-08-16-book-refactor` and `2026-08-26-audio-video-tag-refactor` plans are superseded by the 2026-09-01 media plan; its Task 10 deletes them.
+The hygiene plan `2026-08-15-codebase-hygiene` is **complete** (74/74 boxes, git-verified 2026-09-01; S1–S6 + Part B A1–A4). The media plan `2026-09-01-media-refactor-nginx-entities` **main pass (Tasks 1–10) is complete 2026-09-14** — books/video/tag refactors, nginx X-Accel, author/level/genre entities, React contract freeze (`docs/superpowers/specs/react-kickoff-annex.md`). Its **Part G follow-ons (Tasks 11–16) remain open** and are tracked in STATE.md. `2026-05-26-monorepo-restructure` is largely complete. The superseded `2026-08-16-book-refactor` and `2026-08-26-audio-video-tag-refactor` plans (and the 2026-08-16 book spec) were deleted by the media plan's Task 10 on 2026-09-14 — recover from git history (`git log --follow`) if ever needed; do not recreate them. The **audio module refactor has no plan yet** (user-deferred); until one exists, `/audio/` endpoints stay legacy zero-auth — flag loudly in any deployment that matters.

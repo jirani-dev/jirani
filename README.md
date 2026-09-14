@@ -40,3 +40,11 @@ docker compose down -v
   no `requirements.txt`.
 - **Uploads** are written to `settings.AUDIO_DIR` / `UPLOAD_DIR` / `COVER_DIR` /
   `VIDEO_DIR`, all anchored to `backend/`. Never use a relative path for file I/O.
+- **Media is served by nginx** — `docker compose up -d --build` brings up the
+  stack (nginx:80 is the only published port; API at `/api/*`). Protected media
+  streams go through nginx's internal X-Accel mechanism — never expose `/media/`
+  publicly. Note: the backend image is baked — rebuild (`docker compose build
+  backend`) after code changes, only `./uploads` is bind-mounted.
+- **Troubleshooting:** if API calls return 502 after a `backend` container
+  restart, `docker compose restart nginx` — nginx caches the upstream's IP at
+  startup and must be re-resolved.
