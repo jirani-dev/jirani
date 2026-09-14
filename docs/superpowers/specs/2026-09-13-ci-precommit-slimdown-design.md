@@ -256,7 +256,7 @@ jobs:
           fi
 ```
 
-Secrets/variable (user-executed, GitHub UI — unchanged discipline from 2026-09-01 Task 2 Step 3): run `opencode models --verbose` first, pick a provider with env-var auth, set secret `AI_REVIEW_API_KEY` + variable `AI_REVIEW_MODEL` to the exact model string, then replace the `PROVIDER_API_KEY` placeholder with the provider's real env-var name. Do not guess the name.
+Secrets/variable (user-executed, GitHub UI): **confirmed 2026-09-13** — provider is OpenCode Zen, env-var auth verified via the models.dev registry (`"env": ["OPENCODE_API_KEY"]`); model string `opencode/kimi-k3` verified via `opencode models --verbose` (~$3/$15 per Mtok — cents per PR). Set secret `AI_REVIEW_API_KEY` (zen key) + variable `AI_REVIEW_MODEL` = `opencode/kimi-k3`; the workflow maps the secret to `OPENCODE_API_KEY`.
 
 Prompt-injection posture (inherited): diff is data, never instructions; read-only enforced at config level; minimal token scope; human approval is the backstop.
 

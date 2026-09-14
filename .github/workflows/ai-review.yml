@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      PROVIDER_API_KEY: ${{ secrets.AI_REVIEW_API_KEY }}
+      OPENCODE_API_KEY: ${{ secrets.AI_REVIEW_API_KEY }}
       OPENCODE_CONFIG_CONTENT: '{"permission":{"edit":"deny","bash":"deny","task":"deny"}}'
     steps:
       - uses: actions/checkout@v4
