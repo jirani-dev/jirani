@@ -1,0 +1,74 @@
+name: ci
+
+on:
+  pull_request:
+    branches: [refactor, master]
+  push:
+    branches: [refactor, master]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.13"
+
+      - name: Sync dependencies
+        working-directory: backend
+        run: uv sync
+
+      - name: Format check (changed files vs base)
+        working-directory: backend
+        run: |
+          base="${{ github.event.pull_request.base.ref || 'master' }}"
+          files=$(git diff --name-only --relative "origin/$base...HEAD" -- '*.py' || true)
+          if [ -z "$files" ]; then
+            echo "No python changes vs $base — skipping format check"
+          else
+            uv run ruff format --check $files
+          fi
+
+      - name: Lint (changed files vs base)
+        working-directory: backend
+        run: |
+          base="${{ github.event.pull_request.base.ref || 'master' }}"
+          files=$(git diff --name-only --relative "origin/$base...HEAD" -- '*.py' || true)
+          if [ -z "$files" ]; then
+            echo "No python changes vs $base — skipping ruff lint"
+          else
+            uv run ruff check $files --ignore B008
+          fi
+
+      - name: Type check (changed files vs base)
+        working-directory: backend
+        run: |
+          base="${{ github.event.pull_request.base.ref || 'master' }}"
+          files=$(git diff --name-only --relative "origin/$base...HEAD" -- '*.py' || true)
+          if [ -z "$files" ]; then
+            echo "No python changes vs $base — skipping mypy"
+          else
+            uv run mypy $files --strict
+          fi
+
+      - name: Tests (testcontainers Postgres)
+        working-directory: backend
+        run: uv run pytest -v
+
+  docker-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build backend image
+        run: docker build -f backend/Dockerfile .

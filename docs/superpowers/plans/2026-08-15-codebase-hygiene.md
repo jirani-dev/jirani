@@ -307,7 +307,7 @@ cd backend && uv sync && uv run pytest -v
 Expected: sync succeeds against `backend/uv.lock`; tests still `1 passed`.
 
 - [x] **Step 6: Commit**
- 
+
  ```bash
  git add -A
  git commit -m "chore: collapse to a single dependency manifest (backend/pyproject.toml + uv.lock)"
@@ -1475,8 +1475,3 @@ Two options:
 2. **Inline Execution** — work through the tasks in this session with checkpoints via superpowers:executing-plans.
 
 Suggested checkpoints regardless of mode: after **S1** (highest blast radius in Part A), after **S6** (Part A gate — do not start Part B until it is green), and after **A2** (all auth fixes landed, before the characterization suite).
-
-
-
-
-

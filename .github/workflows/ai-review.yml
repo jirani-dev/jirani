@@ -1,0 +1,103 @@
+name: ai-review
+
+on:
+  pull_request:
+    branches: [refactor, master]
+  workflow_dispatch:
+
+concurrency:
+  group: ai-review-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  ai-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      OPENCODE_API_KEY: ${{ secrets.AI_REVIEW_API_KEY }}
+      OPENCODE_CONFIG_CONTENT: '{"permission":{"edit":"deny","bash":"deny","task":"deny"}}'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Gather diff and decide scope
+        run: |
+          base="${{ github.event.pull_request.base.ref || 'master' }}"
+          git diff "origin/$base...HEAD" > /tmp/diff.txt
+          if grep -qE '^diff --git a/backend/' /tmp/diff.txt; then
+            echo "HAS_PY=true" >> "$GITHUB_ENV"
+          else
+            echo "Docs-only diff — skipping model call" >> "$GITHUB_STEP_SUMMARY"
+            echo "HAS_PY=false" >> "$GITHUB_ENV"
+          fi
+
+      - name: Install opencode
+        if: env.HAS_PY == 'true'
+        run: npm install -g opencode-ai
+
+      - name: Assemble prompt (boilerplate + AGENTS.md invariants + diff)
+        if: env.HAS_PY == 'true'
+        run: |
+          invariants=$(sed -n '/^## System Design/,/^## Repository Structure/p' AGENTS.md)
+          if [ -z "$invariants" ]; then
+            echo "::error::invariant section not found in AGENTS.md — failing closed"
+            exit 1
+          fi
+          {
+            cat .github/ai-review-prompt.md
+            printf '\n## The binding invariants (extracted from AGENTS.md)\n\n%s\n\n' "$invariants"
+            printf '# BEGIN DIFF\n'
+            head -c 200000 /tmp/diff.txt
+          } > /tmp/prompt.txt
+
+      - name: Run invariant audit (fail-closed)
+        if: env.HAS_PY == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          opencode run \
+            --model "${{ vars.AI_REVIEW_MODEL }}" \
+            --format json \
+            "$(cat /tmp/prompt.txt)" > /tmp/raw.jsonl 2>&1
+          if ! node -e '
+            const { readFileSync } = require("fs");
+            const lines = readFileSync("/tmp/raw.jsonl", "utf8").trim().split("\n");
+            let text = "";
+            for (const line of lines) {
+              try {
+                const e = JSON.parse(line);
+                if (e.type === "text" && e.part && e.part.type === "text") {
+                  text += e.part.text;
+                }
+              } catch {}
+            }
+            require("fs").writeFileSync("/tmp/report.txt", text);
+          '; then
+            echo "::error::parsing auditor output failed — failing closed"
+            exit 1
+          fi
+          verdict=$(grep -E '^VERDICT: (PASS|VIOLATION)$' /tmp/report.txt | tail -1 || true)
+          if [ -z "$verdict" ]; then
+            echo "::error::no VERDICT line in auditor output — failing closed"
+            exit 1
+          fi
+          echo "$verdict" >> "$GITHUB_STEP_SUMMARY"
+          if grep -q 'VIOLATION' <<< "$verdict"; then
+            echo "::error::audit found violations — merge blocked"
+            exit 1
+          fi
+
+      - name: Post audit report as PR comment
+        if: always() && env.HAS_PY == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -s /tmp/report.txt ]; then
+            gh pr comment "${{ github.event.pull_request.number }}" --body-file /tmp/report.txt || true
+          fi
