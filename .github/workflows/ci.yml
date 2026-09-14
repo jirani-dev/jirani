@@ -27,38 +27,39 @@ jobs:
         working-directory: backend
         run: uv sync
 
-      - name: Format check (changed files vs base)
+      - name: Resolve changed Python files
+        id: py
         working-directory: backend
         run: |
-          base="${{ github.event.pull_request.base.ref || 'master' }}"
-          files=$(git diff --name-only --relative "origin/$base...HEAD" -- '*.py' || true)
-          if [ -z "$files" ]; then
-            echo "No python changes vs $base — skipping format check"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            range="origin/${{ github.event.pull_request.base.ref }}...HEAD"
+          elif [ -n "${{ github.event.before }}" ] && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
+            range="${{ github.event.before }}...HEAD"
           else
-            uv run ruff format --check $files
+            echo "Branch-creation push — no diff basis, skipping scoped checks"
+            range=""
           fi
+          if [ -n "$range" ]; then
+            files=$(git diff --name-only --relative "$range" -- '*.py' || true)
+          else
+            files=""
+          fi
+          echo "files=$files" >> "$GITHUB_OUTPUT"
 
-      - name: Lint (changed files vs base)
+      - name: Format check (changed files)
+        if: steps.py.outputs.files != ''
         working-directory: backend
-        run: |
-          base="${{ github.event.pull_request.base.ref || 'master' }}"
-          files=$(git diff --name-only --relative "origin/$base...HEAD" -- '*.py' || true)
-          if [ -z "$files" ]; then
-            echo "No python changes vs $base — skipping ruff lint"
-          else
-            uv run ruff check $files --ignore B008
-          fi
+        run: uv run ruff format --check ${{ steps.py.outputs.files }}
 
-      - name: Type check (changed files vs base)
+      - name: Lint (changed files)
+        if: steps.py.outputs.files != ''
         working-directory: backend
-        run: |
-          base="${{ github.event.pull_request.base.ref || 'master' }}"
-          files=$(git diff --name-only --relative "origin/$base...HEAD" -- '*.py' || true)
-          if [ -z "$files" ]; then
-            echo "No python changes vs $base — skipping mypy"
-          else
-            uv run mypy $files --strict
-          fi
+        run: uv run ruff check ${{ steps.py.outputs.files }} --ignore B008
+
+      - name: Type check (changed files)
+        if: steps.py.outputs.files != ''
+        working-directory: backend
+        run: uv run mypy ${{ steps.py.outputs.files }} --strict
 
       - name: Tests (testcontainers Postgres)
         working-directory: backend

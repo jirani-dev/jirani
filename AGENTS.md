@@ -32,8 +32,7 @@ Advisory developer agent for **Jirani** — a FastAPI + PostgreSQL offline-libra
 
 **You MAY write to:**
 
-- `docs/**` — specs, plans, design documents
-- `STATE.md` — via the `state` skill
+- `docs/**` — specs, design documents
 - `.opencode/**` — agent/skill/plugin config, when explicitly asked
 
 **You MAY run:**
@@ -75,16 +74,6 @@ This repo works on macOS, Linux (WSL), and Windows. Require these on any machine
 - **Tools on PATH:** `graphify`, `bun`, `node`/`npx`, `docker` (for postgres).
 - **Postgres:** `docker compose up -d db`.
 
-## superpowers
-
-This workspace runs the `obra/superpowers` skills framework.
-
-- **Process skills before implementation skills.** `brainstorming` before any design or feature work; `systematic-debugging` before proposing any fix; `verification-before-completion` before any claim that something is done.
-- **`brainstorming` is a hard gate.** No design work, no plan writing, no implementation until a design has been presented and approved — regardless of how simple the task looks.
-- **Know which agents actually exist** (see the Subagents section below). There is no `architect`, `manager`, `coder`, or `tester` in this workspace. Do not reference an agent that does not exist; check `.opencode/agent/` and the built-in list before naming one.
-- When a skill contains a checklist, create one todo per item and work them in order.
-- When a multi-step task list is running, do not step outside it to make ad-hoc changes.
-
 ## External Knowledge & Global Search (MCPs)
 
 | Server | Use for | Do NOT use for |
@@ -92,14 +81,9 @@ This workspace runs the `obra/superpowers` skills framework.
 | `context7` | external library docs, current API specs missing from the repo | anything inside this repo |
 | `gh_grep` | how other open-source repos implement a pattern | searching this codebase — use graphify |
 
-## Project Skills
-
-- **`state`** — owns `STATE.md`. Fires on completion phrases, "remind me to…", and commit confirmation. `## Decisions Log` and `## Graveyard` are **append-only**; never delete an entry.
-- **`todo`** — `/todo` produces a briefing from STATE.md, the active plans, and git log.
-
 ## Subagents
 
-Subagents run in a **child session with their own context**. Their tool output — a 300-line pytest run, a 2000-line plan file — never enters the main conversation; only their final report does. That is the point: they preserve the primary context, not merely divide labour.
+Subagents run in a **child session with their own context**. Their tool output — a 300-line pytest run, a long audit report — never enters the main conversation; only their final report does. That is the point: they preserve the primary context, not merely divide labour.
 
 **Built-in:** `general` (multi-step work, full tools), `explore` (fast, read-only codebase search), `scout` (read-only external docs and dependency research).
 
@@ -107,45 +91,15 @@ Subagents run in a **child session with their own context**. Their tool output �
 
 | Agent | Model | Writes? | Use it when | Returns |
 |---|---|---|---|---|
-| `coder` | `deepseek-v4-flash` | `backend/app/**` only | you have a complete brief and want implementation on a cheap model | files changed + verify PASS/FAIL |
-| `invariant-auditor` | `kimi-k3` | no | after any change to `backend/app/**`, before committing, when reviewing a proposed snippet | PASS/VIOLATION per invariant with `file:line`, and a commit/do-not-commit verdict |
-| `verifier` | `deepseek-v4-flash` | no | before claiming anything is done, before committing | Pass/fail per DoD command, full output of failures only |
-| `plan-auditor` | `deepseek-v4-flash` | no | "what's next", status checks, before picking up work | Done/open counts per plan, next unchecked task, drift warnings |
+| `review` | `kimi-k3` | no | before claiming anything is done, before committing, when reviewing a diff or a proposed snippet | DoD pass/fail per command + invariant findings with `file:line` + one combined `DONE`/`NOT DONE` verdict |
 
-**Why these models:** mechanical work (applying a verbatim brief, running the DoD commands, counting checkboxes) goes to `deepseek-v4-flash` — cheap, and the task carries no judgment. The `invariant-auditor` gets `kimi-k3` because it is the one subagent doing real reasoning — it must distinguish a *new* invariant violation from the pre-existing debt listed in this file, and a weak model there either false-alarms (you learn to ignore it) or misses real ones (worse). Pay for judgment only where judgment lives.
+**Why kimi-k3:** the agent does real reasoning — it must distinguish a *new* invariant violation from the pre-existing debt listed in this file's invariant table, and a weak model there either false-alarms (you learn to ignore it) or misses real ones (worse). The mechanical DoD commands ride along in the same dispatch; at local frequency the model cost is trivial. The same kimi-k3 audit runs as the CI `ai-review` check on every PR — same model, same contract, agreeing verdicts. Pay for judgment only where judgment lives.
 
-**Invocation:** `@coder <brief>` / `@invariant-auditor <request>` to run one directly, or `/coder`, `/done` (audit + verify, one gate), `/next` for the pre-wired versions that inject the current diff and plan state automatically.
-
-### Coder handoff — propose on the strong model, implement on the cheap one
-
-The `coder` runs `opencode/deepseek-v4-flash` and can edit `backend/app/**`. It starts cold — it sees nothing of this conversation, only the brief you paste. So the brief must be self-contained. When you, as the primary agent, propose a code change, end the proposal with a complete brief block the user can hand off:
-
-```
---- CODER BRIEF (paste to @coder) ---
-GOAL: <one sentence>
-FILES:
-  <path> — <exact change or full replacement code>
-VERIFY: <command, run from backend/ with uv run>
-RED-FIRST: <test file that must fail first + expected red reason, or "none — characterization pin">
-INVARIANTS: <which of the six this touches, or "none">
----
-```
-
-Rules for the brief:
-
-- **Self-contained.** No "as discussed above" — there is no above for the coder.
-- **Exact code, not descriptions.** If the brief says "add a field", the cheap model decides the field name. Give it the code.
-- **A runnable VERIFY command** the coder can execute without you.
-- **Red-first.** For new behavior or bugfixes the brief leads with the failing test (`RED-FIRST`) and the VERIFY command must be expected to fail before the implementation exists; with the test shown to fail red, then the implementation, then green. Characterization pins over existing legacy code get `RED-FIRST: none — characterization pin`.
-- Only brief when implementation cost is real. A one-line edit or a config flag is not worth the handoff.
-
-After the coder reports back: run `/done` (dispatches the invariant audit + DoD verify in one gate), tick on green, then commit. The coder never commits.
+**Invocation:** `@review <what to gate>` to run one directly, or `/done` for the plan-task version that resolves the task box, dispatches the gate, and ticks on green (grandfathered to the media refactor plan).
 
 **When the primary agent should dispatch one without being asked:**
 
-- Finished a task in a multi-task plan → `verifier`, then `invariant-auditor`. Per task, not once at the end — a violation caught three tasks later has already been built on.
-- About to say "this is done" or "tests pass" → `verifier` first. A completion claim without its output is a guess.
-- Reviewing a diff longer than ~50 lines → `invariant-auditor`, so the review does not consume primary context.
+- About to say "this is done" or "tests pass", or reviewing a diff longer than ~50 lines → `review` first. A completion claim without its output is a guess; the dispatch also keeps long review output out of primary context.
 - Two or more genuinely independent read-only questions → dispatch in parallel, one subagent each.
 
 **Do not** dispatch a subagent for a single file read, a question already answered in this session, or anything needing conversation history — subagents start cold and know only what the dispatch prompt tells them. Write the prompt as if to a competent stranger: state the task, the files, and the exact shape of the answer you want back.
@@ -192,6 +146,7 @@ Where things go:
 Advisory, not binding — apply judgment. Each of these is a lesson already paid for in this codebase.
 
 - **Validate first, mutate second.** All guards before any write, so a rejected request leaves nothing behind.
+- **Tests are the contract.** Every behavior change ships with tests (CI enforces the suite). For bugfixes and service-layer logic, write the failing test first; for routers, config, and migrations, order is free.
 - **Exceptions are for exceptional cases.** A failed login is a return value, not a raise. A function typed `-> bool` must be able to return `False`.
 - **Know where the correctness boundary is.** The DB constraint is the guarantee; the application-level check is UX. Handle both, and do not mistake one for the other.
 - **Keyword-only for boolean parameters.** `change_password(user, pw, *, first_login=True)`. A positional flag is unreadable at the call site and easy to misplace.
@@ -200,53 +155,6 @@ Advisory, not binding — apply judgment. Each of these is a lesson already paid
 - **Prefer the specific operation.** `startswith()` over `like(f"{x}%")` — the general one makes user input load-bearing on wildcard characters.
 - **Functions must be correct on their own terms.** Do not depend on a decorator in another file to make a branch unreachable.
 - **Deleting dead code is a contribution.** Untested dead code invites future callers to trust it. Git is the archive.
-
-## Test-Driven Development (binding)
-
-The superpowers `test-driven-development` skill (Iron Law, red-green-refactor)
-governs any feature, bugfix, or behavior change. Invoke it with the `skill`
-tool before writing code for one.
-
-**The Iron Law.** No production code without a failing test first. A test that
-passes immediately on first run proves nothing — it is asserting existing
-behavior, not the change. Tests written after the code describe what the code
-does; tests written first describe what it must do.
-
-**Red-Green-Refactor.** (1) RED: write one failing test for one behavior.
-(2) Verify it fails, and for the expected reason — `ModuleNotFoundError` for a
-missing module, `AssertionError` for wrong behavior — not a typo. (3) GREEN:
-minimal code to pass. (4) Verify the suite is green, then (5) REFACTOR, keeping
-the suite green. Repeat. Commit after each completed cycle; never commit
-production code whose test was not witnessed failing first.
-
-**Characterization first for legacy code.** Refactoring untested code
-(audio/video/tag today) starts by pinning current behavior with
-characterization tests — including known-broken behavior, recorded as
-documented bugs — then refactors under the pin, fixing each bug red-first. Do
-not skip the pin to "get going"; a refactor without it silently drops behavior
-you did not know existed.
-
-**Plans are written red-green.** Every plan task that produces code has the
-media-refactor shape: write failing test → run and record the red output →
-implement → run and record green → lint/type → commit. The reference pattern is
-Task 5 of the media refactor plan
-(`docs/superpowers/plans/2026-09-01-media-refactor-nginx-entities.md`) — a fused
-rewrite with a data-preserving migration, red-first probes, and per-file gates.
-
-**Coder briefs are red-first.** The brief block names the failing test as the
-first artifact and a VERIFY command expected to fail before implementation. A
-brief that starts with implementation code is invalid; hand it back.
-
-**DoD gate.** "Every new/changed function is covered by a test that was
-witnessed failing (red) before the code made it pass (green)" is part of the
-Definition of Done. `verifier` reports this gate; a change whose plan task or
-brief records no red evidence (outside characterization pins) is NOT DONE.
-
-## State Management
-
-When the user signals task completion ("verify and commit", "done", "ship it", "we're done", "that's it", "heading out", "goodbye") OR confirms a commit you proposed ("yes", "commit it", "go ahead", "commit please", "push it"), invoke the `state` skill to update `STATE.md` before responding.
-
-When the user says "remind me to do X" / "remember to" / "don't forget to", append to `STATE.md` under "Remind Me (Future)".
 
 ## Execution Boundaries
 
@@ -272,17 +180,14 @@ Notes that make the difference between these working and not:
 
 - **`uv run` is mandatory.** A bare `pytest` or `ruff` uses whatever is on PATH, not `backend/.venv`.
 - **`--ignore B008`** — FastAPI's `Depends()` default-argument idiom trips bugbear B008 by design. This is pre-existing, repo-wide, and out of scope.
-- **mypy on changed files only.** `mypy . --strict` across the repo surfaces pre-existing debt unrelated to your change. Log those in STATE.md; do not fix unrelated files.
+- **mypy on changed files only.** `mypy . --strict` across the repo surfaces pre-existing debt unrelated to your change. Log those in the PR or spec; do not fix unrelated files.
 - **Tests need a running Docker daemon** — the testcontainers harness starts its own `postgres:16-alpine`. You do **not** need `docker compose up -d db` for tests.
 
-## Tick the plan box in the same commit
+## The one process gate: the reviewer
 
-When the change completes a task from a plan in `docs/superpowers/plans/`, ticking the box is part of "done", not an optional extra step:
+There is no mandated workflow — work how you like. A change is done when the `review` agent passes it locally (`@review …` or `/done`) and CI is green (`quality`, `docker-build`, `ai-review`). What the reviewer passes is good enough.
 
-1. Before committing, open the plan file and flip that task's `- [ ]` to `- [x]`.
-2. Include the plan file in the **same commit** as the code. The diff mixes a code change and a docs tick, cleanly separated by path.
-
-Do not commit the code and tick the box in two commits, and do not defer the tick to "later" — a later tick is the drift this rule exists to prevent. `docs/**` is writable by the agent, so there is no permission reason to skip it. If a commit completes no plan task, this step does not apply.
+**Grandfathered:** while the media refactor plan is in flight, tick its task box in the same commit as the code.
 
 ## Failure Protocol
 
@@ -290,10 +195,6 @@ Do not commit the code and tick the box in two commits, and do not defer the tic
 - Test fails after **3 consecutive autonomous attempts** → STOP. Do not keep looping. Print the exact failing output and ask for direction.
 - Config or tooling behaving unexpectedly → read the schema or run `--help` before guessing. Report what you found.
 
-## Plans and Specs
+## Docs
 
-One tree only: `docs/superpowers/plans/` and `docs/superpowers/specs/`. All new plans and specs go here.
-
-The older `docs/plans/` and `docs/specs/` trees were deleted on 2026-08-16 — the auth work was fully committed. The book-refactor and audio-video-tag refactors were then superseded on 2026-09-01 by `docs/superpowers/specs/2026-09-01-media-refactor-nginx-entities-design.md` + its plan; the media plan's Task 10 deletes those older files. Recover any deleted plan from git history (`git log --follow -- docs/plans/<file>` or `docs/superpowers/plans/<file>`) if ever needed; do not recreate the tree.
-
-The hygiene plan `2026-08-15-codebase-hygiene` is **complete** (74/74 boxes, git-verified 2026-09-01; S1–S6 + Part B A1–A4). The media plan `2026-09-01-media-refactor-nginx-entities` **main pass (Tasks 1–10) is complete 2026-09-14** — books/video/tag refactors, nginx X-Accel, author/level/genre entities, React contract freeze (`docs/superpowers/specs/react-kickoff-annex.md`). Its **Part G follow-ons (Tasks 11–16) remain open** and are tracked in STATE.md. `2026-05-26-monorepo-restructure` is largely complete. The superseded `2026-08-16-book-refactor` and `2026-08-26-audio-video-tag-refactor` plans (and the 2026-08-16 book spec) were deleted by the media plan's Task 10 on 2026-09-14 — recover from git history (`git log --follow`) if ever needed; do not recreate them. The **audio module refactor has no plan yet** (user-deferred); until one exists, `/audio/` endpoints stay legacy zero-auth — flag loudly in any deployment that matters.
+`docs/team/` holds the guidebook (onboarding, workflow, decisions). `docs/superpowers/plans/2026-09-01-media-refactor-nginx-entities.md` is the in-flight media refactor — the only process document left; it retires when the plan completes. No new specs or plans: the reviewer is the gate (see above). Recover deleted historical docs from git history (`git log --follow -- docs/superpowers/<path>`).
