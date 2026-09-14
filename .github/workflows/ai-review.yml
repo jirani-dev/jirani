@@ -61,10 +61,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # The prompt goes over STDIN: a single CLI argument is capped at ~128KB
+          # (MAX_ARG_STRLEN) and a big PR diff blows past it — `opencode run "$(cat ...)"`
+          # dies with exit 126 (E2BIG) exactly when the diff is largest.
           opencode run \
             --model "${{ vars.AI_REVIEW_MODEL }}" \
             --format json \
-            "$(cat /tmp/prompt.txt)" > /tmp/raw.jsonl 2>&1
+            < /tmp/prompt.txt > /tmp/raw.jsonl 2>&1
           if ! node -e '
             const { readFileSync } = require("fs");
             const lines = readFileSync("/tmp/raw.jsonl", "utf8").trim().split("\n");
