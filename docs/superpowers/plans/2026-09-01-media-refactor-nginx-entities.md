@@ -985,7 +985,7 @@ TOKEN=$(python3 -c "import json,sys; print(json.load(open('/tmp/login.json'))['a
 
   Expected: `root OK`; login returns a token. (`/api/` prefix proves the strip works; a 404 at `http://localhost/api/` curl without prefix-strip would mean the proxy config is wrong.)
 
-- [ ] **Step 5: The one Range integration check (replaces the deleted Python Range tables)** — upload or seed a small video file, then:
+- [x] **Step 5: The one Range integration check (replaces the deleted Python Range tables)** — upload or seed a small video file, then:
 
 ```bash
 curl -s -D - -o /dev/null -H "Authorization: Bearer $TOKEN" \
