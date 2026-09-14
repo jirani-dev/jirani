@@ -95,3 +95,29 @@ VERDICT: DONE | NOT DONE
 ```
 
 If the verdict is NOT DONE, the last line names the single most important thing to fix first. Keep the whole report under 60 lines — the caller wants a decision, not an essay.
+
+## Example (excerpt — shape only)
+
+```
+REVIEW — overdue flag on book
+
+DEFINITION OF DONE
+ruff format     PASS
+ruff check      PASS
+mypy (strict)   PASS   [files: app/models/book.py]
+pytest          PASS   [138 passed]
+plan box ticked N/A (no plan task completed)
+
+INVARIANT AUDIT
+1. Layering            VIOLATION
+   backend/app/api/book_router.py:41 — router computes the overdue bool; move the rule into BookService.
+2. Error mapping       PASS
+3. CWD-relative I/O    PASS
+4. SQLAlchemy 2.0      PASS
+5. Tests on Postgres   PRE-EXISTING (video module, untouched)
+6. Naming              PASS
+
+BLOCKING: 1   PRE-EXISTING: 1
+VERDICT: NOT DONE
+Fix the layering violation first.
+```

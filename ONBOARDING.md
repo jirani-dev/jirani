@@ -61,6 +61,31 @@ runs the DoD.
 2. **PR** — three checks run: `quality` (ruff + mypy + pytest), `docker-build`,
    `ai-review` (see `CONTRIBUTING.md`). Human approval merges.
 
+### Example — one full cycle
+
+```bash
+# 1. make your change (any editor, any order)
+#    say you add an "overdue" flag to books
+
+# 2. gate it locally — the reviewer runs the DoD + audits the invariants
+@review the overdue flag change in backend/app/models/book.py
+
+# 3. read the report; fix what it blocks, e.g.:
+#    "1. Layering VIOLATION — book_router.py:41 computes the overdue bool;
+#     move the rule into BookService."
+#    re-run @review after fixing
+
+# 4. commit with the repo style
+git commit -m "feat: overdue flag on book"        # good — says what changed
+git commit -m "update stuff"                      # bad — says nothing
+
+# 5. push, open the PR, watch the three checks, request a human review
+```
+
+Commit messages follow one rule: a future teammate should guess the diff
+from the message alone (`feat:`, `fix:`, `test:`, `refactor:`, `chore:`,
+`ci:`, `docs:`).
+
 Branches: `master` is the mainline and hub (it carries the agent config and
 docs). `refactor` is the active development line until the media refactor
 completes. Branch names: `feature/*`, `fix/*`, `tooling/*`.
