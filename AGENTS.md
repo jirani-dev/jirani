@@ -88,7 +88,7 @@ Subagents run in a **child session with their own context**. Their tool output �
 
 **Why kimi-k3:** the agent does real reasoning — it must distinguish a *new* invariant violation from the pre-existing debt listed in this file's invariant table, and a weak model there either false-alarms (you learn to ignore it) or misses real ones (worse). The mechanical DoD commands ride along in the same dispatch; at local frequency the model cost is trivial. The CI `ai-review` check runs the same model (repository variable `AI_REVIEW_MODEL` = `opencode/kimi-k3`) against the same invariant table on every PR, but a narrower contract: CI audits invariants only and emits `VERDICT: PASS|VIOLATION`; the local agent audits invariants **and** runs the DoD and emits `VERDICT: DONE|NOT DONE`. Pay for judgment only where judgment lives.
 
-**Invocation:** `@review <what to gate>` to run one directly, or `/done` for the plan-task version that resolves the task box, dispatches the gate, and ticks on green (grandfathered to the media refactor plan).
+**Invocation:** `@review <what to gate>` to run one directly, or `/done` to dispatch the same gate.
 
 **When the primary agent should dispatch one without being asked:**
 
@@ -213,8 +213,6 @@ Notes that make the difference between these working and not:
 
 There is no mandated workflow — work how you like. A change is done when the `review` agent passes it locally (`@review …` or `/done`) and CI is green (`quality`, `docker-build`, `ai-review`), and the GitHub ruleset in `.github/rulesets/protected-branches.json` makes those checks a hard requirement to merge into `master` or `refactor`. What the reviewer passes is good enough.
 
-**Grandfathered:** while `docs/superpowers/plans/2026-09-01-media-refactor-nginx-entities.md` still has open `- [ ]` boxes, tick its task box in the same commit as the code. When the last box is ticked, delete this paragraph, Part 3 of `.opencode/agent/review.md`, and steps 1 and 5 of `.opencode/commands/done.md`.
-
 ## Failure Protocol
 
 - Missing dependency → check `backend/pyproject.toml`, then `uv add <pkg>` (asks for confirmation; it updates `pyproject.toml` and `uv.lock` together). Never hand-edit either file. There is no `requirements.txt`; do not create one.
@@ -230,4 +228,4 @@ The `superpowers` plugin is pinned in `.opencode/opencode.jsonc` and supplies pr
 
 ## Docs
 
-`docs/team/` holds the guidebook (onboarding concepts, decisions log). `docs/superpowers/specs/` and `docs/superpowers/plans/` hold design artifacts — optional, never gates (see Superpowers). `docs/superpowers/plans/2026-09-01-media-refactor-nginx-entities.md` is the one plan with a live tick rule (see "The one process gate"); it retires when its last box is ticked. Recover deleted historical docs from git history (`git log --follow -- docs/superpowers/<path>`).
+`docs/team/` holds the guidebook (onboarding concepts, decisions log). `docs/superpowers/specs/` and `docs/superpowers/plans/` hold design artifacts — optional, never gates (see Superpowers). Recover deleted historical docs from git history (`git log --follow -- docs/superpowers/<path>`).

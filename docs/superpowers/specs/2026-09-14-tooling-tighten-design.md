@@ -460,4 +460,3 @@ Recorded 2026-09-14, after the final whole-branch review (12 commits, base `2163
 - **§3/§8's "decisions.md #7 owner pointer drops `workflow.md`" was a no-op** — #7 never referenced `workflow.md`; nothing to change.
 - **§9.3's dead-reference grep must target flag forms** — the literal `B008` appears legitimately in `backend/pyproject.toml` (the sanctioned ignore) and in `.superpowers/` scratch; the check is for `--ignore B008` / `--ignore=B008`.
 - **`ci.yml` pytest `-v` removal** happened in the fix wave, not Task 4 (brief miss; found by final review).
-- **Resolution (2026-09-14, post-restart):** the deferred errors landed as `e0ef534` — B904 fixed `from None`, `RoleEnum` → `enum.StrEnum` (suite arbiter: 180 passed), E501s wrapped, unused type-ignore dropped. `ruff check .` reports 0 for the first time; `per-file-ignores` now carries only true Invariant-6/audio debt (N801 rows, E711) plus the intentional N802.

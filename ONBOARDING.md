@@ -35,7 +35,7 @@ create a database by hand). Machine-specific opencode overrides go in
 |---|---|
 | `opencode.jsonc` | Shared config: plugins (graphify, superpowers — pinned), MCP servers, and the **permission block**. The agent edits `backend/app/**` with a confirmation prompt on every edit; dependencies, packaging, schema, and destructive git operations are denied or ask |
 | `agent/review.md` | The one review gate — runs the DoD check commands (from `AGENTS.md`) AND audits the diff against the six invariants, one combined verdict. Used by `/done` and before claiming anything works |
-| `commands/done.md` | `/done` — dispatches the gate and ticks the plan box on green (grandfathered to the media refactor plan) |
+| `commands/done.md` | `/done` — dispatches the review gate on demand |
 | `plugins/graphify.js` | Prints a one-time reminder to query the knowledge graph before grepping raw files |
 
 ## 3. Graphify — query the map before reading code

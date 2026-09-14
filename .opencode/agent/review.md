@@ -51,12 +51,6 @@ Rules you must follow:
 - **Do not propose rewrites.** Name the invariant, the location, and the smallest change that would satisfy it — one or two sentences.
 - Consult graphify before reading source files when you need to understand how something connects.
 
-## Part 3 — Plan tick (grandfathered)
-
-If the changed files complete a task in `docs/superpowers/plans/2026-09-01-media-refactor-nginx-entities.md` (the only live plan), confirm its box was flipped to `[x]` in the working tree. Unticked → `NOT DONE` until staged.
-
-Retirement: when that file has no `- [ ]` boxes left, this Part is deleted along with steps 1 and 5 of `/done` and the "Grandfathered" paragraph in AGENTS.md.
-
 ## Output format
 
 ```
@@ -67,7 +61,6 @@ ruff format --check  PASS | FAIL | NOT RUN
 ruff check           PASS | FAIL | NOT RUN
 mypy (strict)        PASS | FAIL | NOT RUN   [files: a.py, b.py]
 pytest               PASS | FAIL | NOT RUN   [N passed, M failed]
-plan box ticked      YES | NO | N/A (no plan task completed)
 
 INVARIANT AUDIT
 1. Layering            PASS | VIOLATION | N/A | PRE-EXISTING
@@ -100,7 +93,6 @@ ruff format --check  PASS
 ruff check           PASS
 mypy (strict)        PASS   [files: app/models/book.py]
 pytest               PASS   [138 passed]
-plan box ticked      N/A (no plan task completed)
 
 INVARIANT AUDIT
 1. Layering            VIOLATION
