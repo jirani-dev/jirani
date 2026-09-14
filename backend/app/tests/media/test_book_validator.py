@@ -34,3 +34,15 @@ def test_valid_pdf_returns_lowercase_extension() -> None:
 def test_valid_epub_returns_lowercase_extension() -> None:
     result = ContentValidator().validate(b"PK\x03\x04 epub stub bytes", "book.EPUB")
     assert result == "epub"
+
+
+def test_no_dot_name_reports_empty_extension() -> None:
+    with pytest.raises(InvalidBookFile) as exc:
+        ContentValidator().validate(b"%PDF-1.4 stub", "noext")
+    assert exc.value.detail == "File extension not allowed: "
+
+
+def test_dotfile_without_real_extension_rejected() -> None:
+    with pytest.raises(InvalidBookFile) as exc:
+        ContentValidator().validate(b"%PDF-1.4 real stub bytes", ".pdf")
+    assert exc.value.detail == "File extension not allowed: "

@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from app.config import settings
 from app.services.book_errors import InvalidBookFile
 
@@ -14,7 +16,7 @@ class ContentValidator:
                 f"File exceeds maximum upload size of {settings.MAX_UPLOAD_SIZE} bytes"
             )
 
-        extension = filename.rsplit(".", 1)[-1].lower()
+        extension = Path(filename).suffix.lstrip(".").lower()
         if extension not in settings.ALLOWED_EXTENSIONS:
             raise InvalidBookFile(f"File extension not allowed: {extension}")
 
