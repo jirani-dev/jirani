@@ -57,7 +57,7 @@ track starts). The backend contract below is frozen; React pins to it.
 
 ## Backend contract frozen surface (for the SPA to pin)
 
-- Response schemas: `BookRead` (incl. `cover_url`), `VideoView`, `TagRead`,
+- Response schemas: `BookRead` (incl. `cover_url`), `VideoRead`, `TagRead`,
   `AuthorRead`/`LevelRead`/`GenreRead`, `Page[T]`.
 - Error body shape: `{detail: str}`.
 - Auth: Bearer JWT with role claim.

@@ -9,7 +9,7 @@ class VideoCreate(BaseModel):
     file_path: str
 
 
-class VideoView(BaseModel):
+class VideoRead(BaseModel):
     id: int
     title: str
     description: str | None = None
