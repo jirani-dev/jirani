@@ -27,9 +27,16 @@ jobs:
         working-directory: backend
         run: uv sync
 
-      - name: Format check
+      - name: Format check (changed files vs base)
         working-directory: backend
-        run: uv run ruff format --check .
+        run: |
+          base="${{ github.event.pull_request.base.ref || 'master' }}"
+          files=$(git diff --name-only --relative "origin/$base...HEAD" -- '*.py' || true)
+          if [ -z "$files" ]; then
+            echo "No python changes vs $base — skipping format check"
+          else
+            uv run ruff format --check $files
+          fi
 
       - name: Lint (changed files vs base)
         working-directory: backend

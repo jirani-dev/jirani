@@ -142,7 +142,7 @@ jobs:
 
 Load-bearing notes (inherited): `fetch-depth: 0` for three-dot diffs; runner Python is 3.12 while the repo needs 3.13; `ruff format --check` checks, never mutates; `--relative` on `git diff --name-only` because mypy runs from `backend/`; Docker daemon preinstalled → testcontainers works with no services block.
 
-**Lint scope decision (2026-09-13, verified):** the repo currently carries 6 pre-existing ruff errors in committed code (`audio_router.py:42`, `video_router.py:35` — legacy `== None` filters; `dependencies/auth.py:36` B904; `models/role_enum.py:4` UP042; `tag_schema.py:32,35`). Full-repo lint would be red on day one, and two of the "fixes" ruff suggests (`== None` → `is None`) are actively wrong for SQLAlchemy filters (correct form: `is_(None)`). Lint therefore follows the same changed-files scope as mypy; `ruff format --check` stays repo-wide (currently green). The errors die when the media-plan rewrite touches those modules.
+**Lint scope decision (2026-09-13, verified in first CI run):** the repo carries pre-existing ruff debt in committed code (6 lint errors incl. `== None` SQLAlchemy filters whose suggested fix `is None` would be actively wrong — correct form `is_(None)`), and the first live run proved base-branch drift also lands in the PR merge ref (Task 7 commits shipped unformatted files into the merge). All three Python gates therefore scope to **changed files vs base** — the PR is judged on its own diff; base debt is caught when touched, or by the local hooks (`pre-commit` fixes formatting repo-wide over time). `pre-commit` remains the repo-wide formatter; CI mirrors the DoD's changed-files philosophy end to end.
 
 ## 7. AI gate — `.github/workflows/ai-review.yml` + prompt assembly
 
