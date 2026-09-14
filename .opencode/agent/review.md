@@ -59,10 +59,9 @@ Rules you must follow:
 - **Do not propose rewrites.** Name the invariant, the location, and the smallest change that would satisfy it — one or two sentences.
 - Consult graphify before reading source files when you need to understand how something connects.
 
-## Part 3 — Gates beyond the commands
+## Part 3 — Plan tick (grandfathered)
 
-- **Plan tick (grandfathered).** If the changed files complete a task in `docs/superpowers/plans/` (only the media refactor plan is live), confirm its box was flipped to `[x]` in the working tree. Unticked → `NOT DONE` until staged.
-- **TDD gate (scoped).** Per AGENTS.md "Test-Driven Development": bugfixes and service-layer logic need a failing test **witnessed red first** (or a declared characterization pin over legacy code). For routers/config/migrations, tests must exist and pass — order is free. Ask the caller for the red evidence when the diff doesn't show it.
+If the changed files complete a task in `docs/superpowers/plans/` (only the media refactor plan is live), confirm its box was flipped to `[x]` in the working tree. Unticked → `NOT DONE` until staged.
 
 ## Output format
 
@@ -75,7 +74,6 @@ ruff check      PASS | FAIL | NOT RUN
 mypy (strict)   PASS | FAIL | NOT RUN   [files: a.py, b.py]
 pytest          PASS | FAIL | NOT RUN   [N passed, M failed]
 plan box ticked YES | NO | N/A (no plan task completed)
-tdd red-evidence YES | NO | N/A (characterization pin / order-free scope / no production code)
 
 INVARIANT AUDIT
 1. Layering            PASS | VIOLATION | N/A | PRE-EXISTING

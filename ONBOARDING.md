@@ -48,20 +48,17 @@ Read source files last, not first.
 
 `AGENTS.md` carries the six binding invariants (layering, error mapping,
 no CWD-relative paths, SQLAlchemy 2.0 style, tests on PostgreSQL, naming) and
-the scoped TDD policy: **a failing test comes first for bugfixes and
-service-layer logic** (auth, permissions, media validation); for routers,
-config, and migrations tests are still required — order is free. The CI
-`ai-review` check audits every PR diff against these invariants and blocks
-merge on new violations; `quality` runs the DoD commands.
+the Definition of Done commands. There is **no mandated workflow** — work how
+you like. A change is done when the `review` agent passes it locally
+(`@review …` or `/done`) and CI is green: the `ai-review` check audits every
+PR diff against the invariants and blocks merge on new violations; `quality`
+runs the DoD.
 
 ## 5. How work flows
 
-1. **Spec** — anything non-trivial starts as a design document in
-   `docs/superpowers/specs/` (what/why/constraints/acceptance criteria).
-   Mistakes are cheapest here.
-2. **Build** — implement with the TDD scope above. New model? Export it from
+1. **Build** — however you like. New model? Export it from
    `models/__init__.py` or Alembic will generate a `drop_table` for it.
-3. **PR** — three checks run: `quality` (ruff + mypy + pytest), `docker-build`,
+2. **PR** — three checks run: `quality` (ruff + mypy + pytest), `docker-build`,
    `ai-review` (see `CONTRIBUTING.md`). Human approval merges.
 
 Branches: `master` is the mainline and hub (it carries the agent config and

@@ -27,10 +27,10 @@ problem → choice → consequence, ending with the artifact that owns it.
    hand-maintained manifests drift in different directions; a generated
    lockfile cannot. Never hand-edit the lock; add deps with `uv add`.
    Owner: `backend/pyproject.toml` + `backend/uv.lock`.
-7. **Specs carry design, acceptance criteria, and a task checklist — no
-   separate plan documents.** Learner-edition plans (verbatim code, expected
-   red output) taught the maintainer's workflow; a spec is the artifact teams
-   keep. Owner: `docs/superpowers/specs/`.
+7. **The reviewer is the only process gate** — no mandated workflow, no process
+   documents; work how you like, and what passes the `review` agent locally
+   plus CI is good enough. Owner: `.opencode/agent/review.md` +
+   `.github/workflows/`.
 8. **Checks gate every merge** — CI runs the repo's Definition of Done
    (ruff format/lint, changed-files mypy, full pytest on testcontainers
    Postgres) plus a Docker build sanity check; a claimed-complete change with

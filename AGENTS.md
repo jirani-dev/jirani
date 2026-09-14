@@ -74,16 +74,6 @@ This repo works on macOS, Linux (WSL), and Windows. Require these on any machine
 - **Tools on PATH:** `graphify`, `bun`, `node`/`npx`, `docker` (for postgres).
 - **Postgres:** `docker compose up -d db`.
 
-## superpowers
-
-This workspace runs the `obra/superpowers` skills framework.
-
-- **Process skills before implementation skills.** `brainstorming` before any design or feature work; `systematic-debugging` before proposing any fix; `verification-before-completion` before any claim that something is done.
-- **`brainstorming` is a hard gate.** No design work, no implementation until a design (spec) has been presented and approved — regardless of how simple the task looks.
-- **Know which agents actually exist** (see the Subagents section below). There is no `architect`, `manager`, `coder`, or `tester` in this workspace. Do not reference an agent that does not exist; check `.opencode/agent/` and the built-in list before naming one.
-- When a skill contains a checklist, create one todo per item and work them in order.
-- When a multi-step task list is running, do not step outside it to make ad-hoc changes.
-
 ## External Knowledge & Global Search (MCPs)
 
 | Server | Use for | Do NOT use for |
@@ -154,6 +144,7 @@ Where things go:
 Advisory, not binding — apply judgment. Each of these is a lesson already paid for in this codebase.
 
 - **Validate first, mutate second.** All guards before any write, so a rejected request leaves nothing behind.
+- **Tests are the contract.** Every behavior change ships with tests (CI enforces the suite). For bugfixes and service-layer logic, write the failing test first; for routers, config, and migrations, order is free.
 - **Exceptions are for exceptional cases.** A failed login is a return value, not a raise. A function typed `-> bool` must be able to return `False`.
 - **Know where the correctness boundary is.** The DB constraint is the guarantee; the application-level check is UX. Handle both, and do not mistake one for the other.
 - **Keyword-only for boolean parameters.** `change_password(user, pw, *, first_login=True)`. A positional flag is unreadable at the call site and easy to misplace.
@@ -162,32 +153,6 @@ Advisory, not binding — apply judgment. Each of these is a lesson already paid
 - **Prefer the specific operation.** `startswith()` over `like(f"{x}%")` — the general one makes user input load-bearing on wildcard characters.
 - **Functions must be correct on their own terms.** Do not depend on a decorator in another file to make a branch unreachable.
 - **Deleting dead code is a contribution.** Untested dead code invites future callers to trust it. Git is the archive.
-
-## Test-Driven Development (scoped, binding where it applies)
-
-The superpowers `test-driven-development` skill (red-green-refactor) governs
-behavior changes. **Binding — failing test first:** bugfixes and service-layer
-logic (auth, permissions, media validation). These are the regression-prone,
-security-adjacent surfaces; a fix without a test that failed first is not
-done.
-
-**Tests required, order free:** routers, config, migrations, and thin wiring
-still ship with tests (CI enforces the suite), but the red-first ceremony is
-not mandatory there.
-
-**The red must be honest.** When you do write the failing test first, verify
-it fails for the expected reason — `ModuleNotFoundError` for a missing
-module, `AssertionError` for wrong behavior — not a typo. A test that passes
-immediately proves nothing.
-
-**Characterization first for legacy code.** Refactoring untested code
-(audio today) starts by pinning current behavior with characterization tests
-— including known-broken behavior, recorded as documented bugs — then
-refactors under the pin, fixing each bug red-first. Do not skip the pin to
-"get going"; a refactor without it silently drops behavior you did not know
-existed.
-
-**Never delete a failing test to go green** (invariant 5). Fix the logic.
 
 ## Execution Boundaries
 
@@ -216,11 +181,11 @@ Notes that make the difference between these working and not:
 - **mypy on changed files only.** `mypy . --strict` across the repo surfaces pre-existing debt unrelated to your change. Log those in the PR or spec; do not fix unrelated files.
 - **Tests need a running Docker daemon** — the testcontainers harness starts its own `postgres:16-alpine`. You do **not** need `docker compose up -d db` for tests.
 
-## Tick the plan box in the same commit
+## The one process gate: the reviewer
 
-**Applies to the media refactor plan only** (`2026-09-01-media-refactor-nginx-entities`, the last plan-format document — grandfathered until it completes, then this rule retires; new work carries its checklist in the spec).
+There is no mandated workflow — work how you like. A change is done when the `review` agent passes it locally (`@review …` or `/done`) and CI is green (`quality`, `docker-build`, `ai-review`). What the reviewer passes is good enough.
 
-While it applies: ticking the completed task's `- [ ]` → `- [x]` is part of "done", folded into the **same commit** as the code — never a separate "later" tick, which is the drift this rule exists to prevent. If a commit completes no plan task, this step does not apply.
+**Grandfathered:** while the media refactor plan is in flight, tick its task box in the same commit as the code.
 
 ## Failure Protocol
 
@@ -228,8 +193,6 @@ While it applies: ticking the completed task's `- [ ]` → `- [x]` is part of "d
 - Test fails after **3 consecutive autonomous attempts** → STOP. Do not keep looping. Print the exact failing output and ask for direction.
 - Config or tooling behaving unexpectedly → read the schema or run `--help` before guessing. Report what you found.
 
-## Plans and Specs
+## Docs
 
-One tree only: `docs/superpowers/specs/`. New work starts as a **spec** that carries the design, acceptance criteria, and a task checklist — there are no separate plan documents going forward.
-
-**Grandfathered:** the media refactor plan (`docs/superpowers/plans/2026-09-01-media-refactor-nginx-entities.md`) is the last plan-format document; it stays in flight (Task 8 of 16) until complete, then retires. The superseded plans (`2026-08-16-book-refactor`, `2026-08-26-audio-video-tag-refactor`) and the completed hygiene plan remain as historical record; recover anything from git history (`git log --follow -- docs/superpowers/plans/<file>`) — do not recreate deleted trees.
+`docs/team/` holds the guidebook (onboarding, workflow, decisions). `docs/superpowers/plans/2026-09-01-media-refactor-nginx-entities.md` is the in-flight media refactor — the only process document left; it retires when the plan completes. No new specs or plans: the reviewer is the gate (see above). Recover deleted historical docs from git history (`git log --follow -- docs/superpowers/<path>`).

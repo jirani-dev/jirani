@@ -44,21 +44,20 @@ them."
 ## 4. How a change actually gets made (the recipe)
 
 1. Get a task from a mentor.
-2. Write the failing test first (for bugfixes and service logic — see the
-   scoped TDD rules in `ONBOARDING.md` §4). Running it fails for the RIGHT
-   reason — if it fails on a typo, that is not the red you wanted.
-3. Write the minimum code to make it green; run the suite.
-4. Cleanup: the DoD commands in `ONBOARDING.md` §6.
-5. Commit with the repo style; push; open the PR; watch the three checks —
-   they enforce steps 2–4 continuously, which is why step 2 is not optional.
+2. Change the code however you like — tests come with it (CI runs the full
+   suite). For bugfixes and service-layer logic, write the failing test
+   first: run it, watch it fail for the RIGHT reason (a typo failing is not
+   the red you wanted), then fix.
+3. Cleanup: the DoD commands in `ONBOARDING.md` §6.
+4. Commit with the repo style; push; open the PR; watch the three checks —
+   `quality`, `docker-build`, `ai-review`. What they pass is good enough.
 
 ## 5. Tests: what "characterization pin" means
 
 A pin is a test that asserts whatever the code DOES today, even its bugs,
 written BEFORE refactoring it. Bugs are pinned deliberately and flipped
 later, on purpose. Writing pins is the standard first task for a reason: it
-teaches the harness, the TDD convention, and the domain with zero production
-risk.
+teaches the test harness and the domain with zero production risk.
 
 ## 6. Reading order (curated)
 
