@@ -104,9 +104,16 @@ jobs:
         working-directory: backend
         run: uv run ruff format --check .
 
-      - name: Lint
+      - name: Lint (changed files vs base)
         working-directory: backend
-        run: uv run ruff check . --ignore B008
+        run: |
+          base="${{ github.event.pull_request.base.ref || 'master' }}"
+          files=$(git diff --name-only --relative "origin/$base...HEAD" -- '*.py' || true)
+          if [ -z "$files" ]; then
+            echo "No python changes vs $base — skipping ruff lint"
+          else
+            uv run ruff check $files --ignore B008
+          fi
 
       - name: Type check (changed files vs base)
         working-directory: backend
@@ -134,6 +141,8 @@ jobs:
 ```
 
 Load-bearing notes (inherited): `fetch-depth: 0` for three-dot diffs; runner Python is 3.12 while the repo needs 3.13; `ruff format --check` checks, never mutates; `--relative` on `git diff --name-only` because mypy runs from `backend/`; Docker daemon preinstalled → testcontainers works with no services block.
+
+**Lint scope decision (2026-09-13, verified):** the repo currently carries 6 pre-existing ruff errors in committed code (`audio_router.py:42`, `video_router.py:35` — legacy `== None` filters; `dependencies/auth.py:36` B904; `models/role_enum.py:4` UP042; `tag_schema.py:32,35`). Full-repo lint would be red on day one, and two of the "fixes" ruff suggests (`== None` → `is None`) are actively wrong for SQLAlchemy filters (correct form: `is_(None)`). Lint therefore follows the same changed-files scope as mypy; `ruff format --check` stays repo-wide (currently green). The errors die when the media-plan rewrite touches those modules.
 
 ## 7. AI gate — `.github/workflows/ai-review.yml` + prompt assembly
 
