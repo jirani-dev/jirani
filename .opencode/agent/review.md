@@ -100,7 +100,7 @@ INVARIANT AUDIT
 2. Error mapping       PASS
 3. CWD-relative I/O    PASS
 4. SQLAlchemy 2.0      PASS
-5. Tests on Postgres   PRE-EXISTING (video module, untouched)
+5. Tests on Postgres   PRE-EXISTING (audio module, untouched)
 6. Naming              PASS
 
 BLOCKING: 1   PRE-EXISTING: 1
