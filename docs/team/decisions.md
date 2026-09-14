@@ -75,3 +75,26 @@ problem → choice → consequence, ending with the artifact that owns it.
     image). If nginx serves 404s while the backend serves the file fine,
     `docker compose up -d --force-recreate nginx` — a `restart` does not
     re-resolve a bind-mounted directory whose inode changed on disk.
+16. **Rules live in tooling where tooling can check them** — prose rules
+    drift (the DoD was copied into five files and two copies disagreed;
+    26 of 300 commits had no type prefix). Now: ruff `N801` is Invariant 6;
+    the invariant table's debt column is mirrored as
+    `[tool.ruff.lint.per-file-ignores]`; the commit format is a commit-msg
+    hook; merge protection is a GitHub ruleset. Prose keeps only what
+    tooling cannot check. Owner: `backend/pyproject.toml`,
+    `.pre-commit-config.yaml`, `.github/rulesets/protected-branches.json`.
+17. **The agent edits application source with a human confirming each
+    edit; dependencies, schema, and packaging stay human-only** — a pure
+    advisory mode made the agent paste snippets for the human to apply,
+    which is the same review with more friction; a fully open mode removes
+    the human from the one place a wrong edit is expensive to undo
+    (migrations, the lock file, the image). `backend/app/**` is `ask`;
+    `pyproject.toml`, `uv.lock`, `Dockerfile`, `alembic.ini`,
+    `migrations/**`, compose are `deny`. Owner: `.opencode/opencode.jsonc`
+    `permission` block; `AGENTS.md` "Operating Mode".
+18. **Design docs are artifacts, never gates** — the superpowers skills
+    (brainstorming, writing-plans) produce specs and plans under
+    `docs/superpowers/`; decision 7 says the reviewer is the only gate.
+    Both are true: a spec records a design, it never becomes a required
+    step for anyone. The plugin is pinned so a skill update cannot change
+    process by surprise. Owner: `AGENTS.md` "Superpowers" and "Docs".

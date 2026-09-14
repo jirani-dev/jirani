@@ -1,50 +1,52 @@
 # Jirani Offline Library Backend
 
-## Run With Docker
+FastAPI + PostgreSQL behind nginx. New here? `ONBOARDING.md` is the guided
+tour, `CONTRIBUTING.md` has the PR rules, `AGENTS.md` is the rulebook.
 
-### 1. Build and start containers
-
-```bash
-docker compose up --build
-```
-
-This starts:
-- API at http://localhost:8000
-- PostgreSQL at localhost:5432
-
-### 2. Stop containers
+## Run with Docker
 
 ```bash
-docker compose down
+docker compose up -d --build    # nginx on :80 (the only published port), API at /api/*, Postgres on :5432
+docker compose down             # stop
+docker compose down -v          # stop and remove the database volume
 ```
 
-### 3. Stop containers and remove database volume
+The backend image is **baked** — only `./uploads` is bind-mounted. After code
+changes: `docker compose build backend && docker compose up -d backend`.
+
+## Run locally (without the backend container)
 
 ```bash
-docker compose down -v
+docker compose up -d db
+cd backend && uv sync && uv run alembic upgrade head && uv run uvicorn app.main:app --reload
 ```
 
-## Notes
+## Schema
 
-- **Schema** is managed by Alembic and applied at container startup
-  (`alembic upgrade head` in `docker/entrypoint.sh`). Locally:
-  `cd backend && uv sync && uv run alembic upgrade head && uv run uvicorn app.main:app --reload`.
-- **Schema changes:** edit the model, then
-  `uv run alembic revision --autogenerate -m "describe change"`,
-  **review the generated file** (autogenerate cannot see renames — it emits a
-  drop plus an add, which destroys data), then `uv run alembic upgrade head`.
-- **Tests** use a testcontainers Postgres. You need a running Docker daemon,
-  but no manual database: `cd backend && uv run pytest -v`.
-- **Dependencies** live only in `backend/pyproject.toml`; `backend/uv.lock` is
-  generated. Add with `uv add <pkg>` — never hand-edit the lock, and there is
-  no `requirements.txt`.
-- **Uploads** are written to `settings.AUDIO_DIR` / `UPLOAD_DIR` / `COVER_DIR` /
-  `VIDEO_DIR`, all anchored to `backend/`. Never use a relative path for file I/O.
-- **Media is served by nginx** — `docker compose up -d --build` brings up the
-  stack (nginx:80 is the only published port; API at `/api/*`). Protected media
-  streams go through nginx's internal X-Accel mechanism — never expose `/media/`
-  publicly. Note: the backend image is baked — rebuild (`docker compose build
-  backend`) after code changes, only `./uploads` is bind-mounted.
-- **Troubleshooting:** if API calls return 502 after a `backend` container
-  restart, `docker compose restart nginx` — nginx caches the upstream's IP at
-  startup and must be re-resolved.
+Managed by Alembic and applied at container startup (`alembic upgrade head`
+in `docker/entrypoint.sh`). To change it: edit the model, then
+`uv run alembic revision --autogenerate -m "describe change"`, **review the
+generated file** (autogenerate cannot see renames — it emits a drop plus an
+add, which destroys data), then `uv run alembic upgrade head`.
+
+## Media
+
+Served by nginx. Protected streams use nginx's internal X-Accel mechanism —
+never expose `/media/` publicly. Uploads are written to `settings.AUDIO_DIR` /
+`UPLOAD_DIR` / `COVER_DIR` / `VIDEO_DIR`, all anchored to `backend/`.
+
+## Deploy
+
+Manual, after merge: `docker compose up -d --build` on the machine. The
+pipeline deliberately does not deploy for you.
+
+## Troubleshooting
+
+- API returns 502 after a `backend` container restart → `docker compose
+  restart nginx` (nginx caches the upstream IP at startup).
+- nginx serves 404 for a file the backend can see → `docker compose up -d
+  --force-recreate nginx` (a restart does not re-resolve a bind-mounted
+  directory whose inode changed).
+
+Tests, dependencies, and the Definition of Done: `AGENTS.md` § Build & Test
+Commands. Setup: `ONBOARDING.md` §1.
