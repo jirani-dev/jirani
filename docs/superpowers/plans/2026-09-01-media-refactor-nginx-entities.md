@@ -1392,6 +1392,3 @@ Plan complete and saved to `docs/superpowers/plans/2026-09-01-media-refactor-ngi
 2. **Subagent-Driven** — dispatch a fresh subagent per task with two-stage review; each task brief must be self-contained (the Interfaces blocks above are the brief material).
 
 Which approach?
-
-
-
