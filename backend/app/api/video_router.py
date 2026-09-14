@@ -9,7 +9,7 @@ from app.database import get_db
 from app.dependencies.auth import RoleChecker
 from app.models.account import Account
 from app.models.role_enum import RoleEnum
-from app.schemas.video_schema import VideoView
+from app.schemas.video_schema import VideoRead
 from app.services.media_errors import InvalidMediaFile, MediaNotFound
 from app.services.video_service import VideoService
 
@@ -23,15 +23,15 @@ def get_video_service(db: Session = Depends(get_db)) -> VideoService:
     return VideoService(db)
 
 
-@router.get("/", response_model=list[VideoView])
+@router.get("/", response_model=list[VideoRead])
 def list_videos(
     svc: VideoService = Depends(get_video_service),
     user: Account = Depends(RoleChecker(ROLES)),
-) -> list[VideoView]:
+) -> list[VideoRead]:
     return svc.list_videos()
 
 
-@router.post("/upload", response_model=VideoView)
+@router.post("/upload", response_model=VideoRead)
 async def upload_video(
     file: UploadFile = File(...),
     title: str = Form(...),
@@ -39,7 +39,7 @@ async def upload_video(
     tags: str = Form(""),
     svc: VideoService = Depends(get_video_service),
     user: Account = Depends(RoleChecker(WRITE_ROLES)),
-) -> VideoView:
+) -> VideoRead:
     data = await file.read()
     tag_names = [t.strip() for t in tags.split(",") if t.strip()]
     try:
@@ -56,12 +56,12 @@ async def upload_video(
         raise HTTPException(status_code=400, detail="Invalid video data") from exc
 
 
-@router.post("/upload_multiple", response_model=list[VideoView])
+@router.post("/upload_multiple", response_model=list[VideoRead])
 async def upload_multiple_videos(
     files: list[UploadFile] = File(...),
     svc: VideoService = Depends(get_video_service),
     user: Account = Depends(RoleChecker(WRITE_ROLES)),
-) -> list[VideoView]:
+) -> list[VideoRead]:
     payloads = [(await file.read(), file.filename or "") for file in files]
     try:
         return svc.upload_multiple(payloads)
@@ -71,7 +71,7 @@ async def upload_multiple_videos(
         raise HTTPException(status_code=400, detail="Invalid video data") from exc
 
 
-@router.patch("/{video_id}", response_model=VideoView)
+@router.patch("/{video_id}", response_model=VideoRead)
 def update_video(
     video_id: int,
     title: str | None = None,
@@ -79,7 +79,7 @@ def update_video(
     tags: str | None = None,
     svc: VideoService = Depends(get_video_service),
     user: Account = Depends(RoleChecker(WRITE_ROLES)),
-) -> VideoView:
+) -> VideoRead:
     tag_names = (
         [t.strip() for t in tags.split(",") if t.strip()] if tags is not None else None
     )
