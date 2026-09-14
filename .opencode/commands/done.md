@@ -2,6 +2,8 @@
 description: Gate a change or plan task — one dispatch runs the DoD commands + invariant audit; tick the box only if it passes
 ---
 
+> Grandfathered to the media refactor plan. Steps 1 and 5 are deleted when `docs/superpowers/plans/2026-09-01-media-refactor-nginx-entities.md` has no `- [ ]` boxes left (see AGENTS.md "The one process gate").
+
 Run the completion gate for the change or task referenced by `$ARGUMENTS` (e.g. `/done Task 8`, `/done 12`, or `/done the auth fix`), then tick the plan box only if the gate passes. If `$ARGUMENTS` is empty and the change doesn't obviously map to a plan task, say so and gate the working tree as-is.
 
 ## 1. Resolve the task box (skip if not a plan task)
