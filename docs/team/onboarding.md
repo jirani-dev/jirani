@@ -31,7 +31,10 @@ objects, never raises HTTPException) → model (`backend/app/models/account.py`:
 what a saved row IS).
 
 This four-layer rule is binding — it is Invariant 1, and the auth module is
-the reference implementation that does it right.
+the reference implementation that does it right. Concrete contrast:
+`auth_router.py` never touches the database — it calls `AuthService`;
+`audio_router.py:40` opens `db.query(...)` directly, which is the shape
+being fixed. Read both; imitate the first.
 
 ## 3. The six rules for people who did not write them
 
