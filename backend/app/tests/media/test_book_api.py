@@ -73,10 +73,10 @@ def _admin_headers(client: TestClient, setup_paths: Path) -> dict[str, str]:
 
 
 def _make_pdf() -> bytes:
-    doc = pymupdf.open()  # type: ignore[no-untyped-call]
+    doc = pymupdf.open()
     doc.new_page()
-    data: bytes = doc.tobytes()  # type: ignore[no-untyped-call]
-    doc.close()  # type: ignore[no-untyped-call]
+    data: bytes = doc.tobytes()
+    doc.close()
     return data
 
 
