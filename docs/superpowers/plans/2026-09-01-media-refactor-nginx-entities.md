@@ -744,15 +744,15 @@ git commit -m "refactor: tag module — 2.0 repo, service layer, auth; drop dead
 - `validate_media(filename: str, *, allowed: frozenset[str]) -> str` — lowercase extension; `InvalidMediaFile(f"File type .{ext} not allowed")` on disallowed (same detail shape as the legacy audio message — the 400 that Task 8's flip pin asserts). The whitelist lives in the validator, not `config.py` (domain knowledge, not deployment settings — deliberate deviation from the book's `ContentValidator`, recorded so nobody "fixes" it)
 - `MediaFileStorage(save_dir: Path)` — `save(file_bytes: bytes, filename: str) -> str` (`mkdir(parents=True, exist_ok=True)`, `{uuid4}_{filename}`, returns the **absolute** path string); `resolve(path: str) -> Path` raising `MediaNotFound` on (a) traversal — `is_relative_to` containment — or (b) `is_file()` false; relative stored paths join to `save_dir` (covers legacy rows holding `"uploads/vids/..."`); `delete(path: str) -> None` (resolve + `unlink(missing_ok=True)`)
 
-- [ ] **Step 1: Write failing tests** — old media plan Task 4's six validator cases (parametrized over `ALLOWED_VIDEO_EXTENSIONS`) + Task 5's nine storage cases (traversal, round-trip, nested names, legacy relative form, missing file, silent delete). The disallowed-extension case asserts the exact detail `File type .txt not allowed`.
+- [x] **Step 1: Write failing tests** — old media plan Task 4's six validator cases (parametrized over `ALLOWED_VIDEO_EXTENSIONS`) + Task 5's nine storage cases (traversal, round-trip, nested names, legacy relative form, missing file, silent delete). The disallowed-extension case asserts the exact detail `File type .txt not allowed`.
 
-- [ ] **Step 2: Verify red** — `cd backend && uv run pytest app/tests/media/test_media_validator.py app/tests/media/test_media_storage.py -v`. Expected: `ModuleNotFoundError: app.services.media_validator`.
+- [x] **Step 2: Verify red** — `cd backend && uv run pytest app/tests/media/test_media_validator.py app/tests/media/test_media_storage.py -v`. Expected: `ModuleNotFoundError: app.services.media_validator`.
 
-- [ ] **Step 3: Implement** per Interfaces.
+- [x] **Step 3: Implement** per Interfaces.
 
-- [ ] **Step 4: Verify green** — same command. Expected: all pass.
+- [x] **Step 4: Verify green** — same command. Expected: all pass.
 
-- [ ] **Step 5: Format, lint, type**
+- [x] **Step 5: Format, lint, type**
 
 ```bash
 cd backend && uv run ruff format app/services/media_errors.py app/services/media_validator.py app/services/media_file_storage.py app/tests/media/test_media_validator.py app/tests/media/test_media_storage.py && uv run ruff check app/services/media_errors.py app/services/media_validator.py app/services/media_file_storage.py app/tests/media/test_media_validator.py app/tests/media/test_media_storage.py --ignore B008 && uv run mypy app/services/media_errors.py app/services/media_validator.py app/services/media_file_storage.py --strict
@@ -760,7 +760,7 @@ cd backend && uv run ruff format app/services/media_errors.py app/services/media
 
 Expected: 0/0.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add backend/app/services/media_errors.py backend/app/services/media_validator.py backend/app/services/media_file_storage.py backend/app/tests/media/test_media_validator.py backend/app/tests/media/test_media_storage.py
