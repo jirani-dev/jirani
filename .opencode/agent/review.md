@@ -96,11 +96,11 @@ If the verdict is NOT DONE, the last line names the single most important thing 
 REVIEW — overdue flag on book
 
 DEFINITION OF DONE
-ruff format --check  PASS
-ruff check           PASS
-mypy (strict)        PASS   [files: app/models/book.py]
-pytest               PASS   [138 passed]
-plan box ticked      N/A (no plan task completed)
+ruff format     PASS
+ruff check      PASS
+mypy (strict)   PASS   [files: app/models/book.py]
+pytest          PASS   [138 passed]
+plan box ticked N/A (no plan task completed)
 
 INVARIANT AUDIT
 1. Layering            VIOLATION
