@@ -35,7 +35,7 @@ class AudioService:
         self, file_bytes: bytes, filename: str, tag_names: list[str]
     ) -> AudioView:
         validate_media(filename, allowed=ALLOWED_AUDIO_EXTENSIONS)
-        saved_path = self.storage.save(file_bytes, filename)
+saved_path = self.storage.save(file_bytes, Path(filename).name)
         track = self.audio_repo.create(
             AudioCreate(
                 title=Path(filename).stem, description=None, file_path=saved_path
