@@ -1,7 +1,7 @@
 # Jirani — an offline digital library for schools
 
-Jirani is a library server for schools where the internet cannot be
-assumed: books, audio, and video served over the school's local network,
+Jirani is a library server for schools in Kenya where the internet cannot
+be assumed: books, audio, and video served over the school's local network,
 on modest hardware, with no cloud in the path. The backend is FastAPI +
 PostgreSQL behind nginx.
 
@@ -17,15 +17,23 @@ the library depends on a connection to the outside world.
 
 ## Goals
 
-- **Offline-first media.** Books, audio, and video stream from local disk
-  through nginx's X-Accel mechanism; protected streams are never public
-  URLs.
-- **Day-one accounts.** Student and teacher accounts mint with temporary
-  credentials that must be replaced at first login.
-- **Honest engineering.** A layered architecture (router → service →
-  repository → model), tests that run on real PostgreSQL, and every change
-  gated by automated review and CI before merge.
+Jirani is aimed at a concrete place: schools in Kenya where a library is
+rare and an internet connection is never guaranteed. In real terms, the
+project succeeds when:
 
+- **A school with no library has one.** A full catalog of books, audio,
+  and video on one machine in the school, organized by level and genre.
+- **No internet needed, no internet bill.** Everything works over the
+  school's local network — no data costs, no cloud subscription, nothing
+  that stops when the connection does.
+- **Hardware the school can afford.** One modest computer runs the whole
+  stack; there is nothing else to buy.
+- **Teachers can use it the same day.** Student and teacher accounts mint
+  with temporary credentials replaced at first login — a class starts the
+  afternoon it is installed.
+- **Students can trust it with their work.** Every change is tested on a
+  real database and reviewed before it ships; a library that loses
+  students' records is worse than none.
 
 ## How it works
 
