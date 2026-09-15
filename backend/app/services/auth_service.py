@@ -155,7 +155,7 @@ class AuthService:
     def setup_admin_account(self, password: str) -> Account:
         admin_user = self.get_user_by_username("admin")
         if admin_user:
-            raise ValueError("Admin account already exists.")
+            raise PermissionError("Admin account already exists.")
         hashed_password = self.get_password_hash(password)
         new_admin = Account(
             username="admin",
