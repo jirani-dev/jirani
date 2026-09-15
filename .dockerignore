@@ -8,9 +8,10 @@ __pycache__/
 uploads/
 *.log
 
-# OpenCode / Superpowers
+# OpenCode / dev docs
 .opencode/
 AGENTS.md
+docs/devs/
 docs/superpowers/
 .graphifyignore
 graphify-out/

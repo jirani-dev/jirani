@@ -133,7 +133,7 @@ Where things go:
 - **New setting or path** → `config.py`. Never a literal in a router.
 - **New model** → define it, then export it from `models/__init__.py`, or `Base.metadata` will not see it and Alembic will generate a `drop_table` for it.
 - **Cross-module helper** → a service. Do not create a `utils` grab-bag.
-- **Design docs** → `docs/superpowers/specs/`, `docs/superpowers/plans/`. See "Docs" below.
+- **Feature specs** → `docs/devs/specs/`, hand-written and tracked — for ongoing features, readable without any plugin. See "Docs" below.
 
 ### Naming
 
@@ -151,7 +151,7 @@ Invariant 6 is the enforceable core; this table is the full convention. Where th
 | Tests | `tests/<area>/test_<module>_<aspect>.py` (`test_book_stream.py`, `test_video_api.py`) | consistent |
 | Settings | `UPPER_CASE` fields and properties on `Settings` (`N802` per-file-ignore on `config.py`) | consistent |
 
-`frontend/` (TypeScript + Vite SPA) lives on the **`frontend` branch** (scaffold landed 2026-09-01, moved off this tree in `358bb45`; merged back when the React track starts): it pins to the frozen backend contract in `docs/superpowers/specs/react-kickoff-annex.md` — response shapes may gain fields, never lose or rename them; API calls go through the same-origin nginx (`/api/*`); media via `/static/covers/` (public) and blob-URL fetches for protected streams. Backend boundaries in this file are unchanged by frontend work.
+`frontend/` (TypeScript + Vite SPA) lives on the **`frontend` branch** (scaffold landed 2026-09-01, moved off this tree in `358bb45`; merged back when the React track starts): it pins to the frozen backend contract in `docs/devs/specs/react-kickoff-annex.md` — response shapes may gain fields, never lose or rename them; API calls go through the same-origin nginx (`/api/*`); media via `/static/covers/` (public) and blob-URL fetches for protected streams. Backend boundaries in this file are unchanged by frontend work.
 
 ## Best Practices
 
@@ -207,7 +207,7 @@ Notes that make the difference between these working and not:
 - **`uv run` is mandatory.** A bare `pytest` or `ruff` uses whatever is on PATH, not `backend/.venv`.
 - **mypy on changed files only.** `mypy . --strict` across the repo can surface debt in files unrelated to your change. Test modules run under a relaxed per-module override in `pyproject.toml`; app code is fully strict.
 - **Tests need a running Docker daemon** — the testcontainers harness starts its own `postgres:16-alpine`. You do **not** need `docker compose up -d db` for tests. Verbosity is set by `addopts` in `pyproject.toml`; do not add `-v`/`-q` by hand.
-- **CI runs the check variant on changed Python files only** (`ci.yml` "Resolve changed Python files"); the `review` agent runs it on `.`.
+- **CI runs the check variant on changed Python files only** (`ci.yml` "Resolve changed Python files"); the `review` agent runs it on `.`. Docs-only PRs (markdown and `docs/**` only) additionally skip the test step in CI (`ci.yml` "Detect docs-only change") — the local DoD is unchanged and the `quality` check still reports.
 
 ## The one process gate: the reviewer
 
@@ -224,8 +224,8 @@ There is no mandated workflow — work how you like. A change is done when the `
 The `superpowers` plugin is pinned in `.opencode/opencode.jsonc` and supplies process skills: `brainstorming`, `writing-plans`, `subagent-driven-development`, `test-driven-development`, `systematic-debugging`, `verification-before-completion`. Use them when they fit. Two rules:
 
 - **This file outranks any skill.** Where a skill's default conflicts with a rule here (paths, permissions, the reviewer as the gate), this file wins.
-- **Skill output is an artifact, not a gate.** A skill may write a spec or plan under `docs/superpowers/`; that document is a design record. It does not become a required step for anyone, and the reviewer remains the only gate.
+- **Skill output is an artifact, not a gate.** A skill may write a spec or plan (its default is `docs/superpowers/`, gitignored — this file's paths win where they differ); that document is a local design record, untracked by git. If a design must live on, promote it by hand into `docs/devs/specs/`. It does not become a required step for anyone, and the reviewer remains the only gate.
 
 ## Docs
 
-`docs/team/` holds the guidebook (onboarding concepts, decisions log). `docs/superpowers/specs/` and `docs/superpowers/plans/` hold design artifacts — optional, never gates (see Superpowers). Recover deleted historical docs from git history (`git log --follow -- docs/superpowers/<path>`).
+`docs/devs/` holds the developer guidebook (`onboarding.md` concepts, `operations.md` runbook, `decisions.md` log) and `specs/` — hand-written specs for ongoing features, readable without the superpowers plugin. Skill-generated artifacts are untracked local state (`docs/superpowers/`, gitignored); historical ones recover from git history (`git log --follow -- docs/devs/<path>`). All of it is optional and never a gate (see Superpowers).
