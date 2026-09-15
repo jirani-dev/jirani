@@ -207,7 +207,7 @@ Notes that make the difference between these working and not:
 - **`uv run` is mandatory.** A bare `pytest` or `ruff` uses whatever is on PATH, not `backend/.venv`.
 - **mypy on changed files only.** `mypy . --strict` across the repo can surface debt in files unrelated to your change. Test modules run under a relaxed per-module override in `pyproject.toml`; app code is fully strict.
 - **Tests need a running Docker daemon** — the testcontainers harness starts its own `postgres:16-alpine`. You do **not** need `docker compose up -d db` for tests. Verbosity is set by `addopts` in `pyproject.toml`; do not add `-v`/`-q` by hand.
-- **CI runs the check variant on changed Python files only** (`ci.yml` "Resolve changed Python files"); the `review` agent runs it on `.`.
+- **CI runs the check variant on changed Python files only** (`ci.yml` "Resolve changed Python files"); the `review` agent runs it on `.`. Docs-only PRs (markdown and `docs/**` only) additionally skip the test step in CI (`ci.yml` "Detect docs-only change") — the local DoD is unchanged and the `quality` check still reports.
 
 ## The one process gate: the reviewer
 
