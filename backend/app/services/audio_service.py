@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.repositories.audio_repo import AudioRepo
 from app.repositories.tag_repo import TagRepo
-from app.schemas.audio_schema import AudioCreate, AudioView
+from app.schemas.audio_schema import AudioCreate, AudioRead
 from app.services.media_errors import MediaNotFound
 from app.services.media_file_storage import MediaFileStorage
 from app.services.media_validator import ALLOWED_AUDIO_EXTENSIONS, validate_media
@@ -28,12 +28,12 @@ class AudioService:
         self.tag_repo = TagRepo(db)
         self.storage = MediaFileStorage(settings.AUDIO_DIR)
 
-    def list_tracks(self) -> list[AudioView]:
-        return [AudioView.model_validate(t) for t in self.audio_repo.list_all()]
+    def list_tracks(self) -> list[AudioRead]:
+        return [AudioRead.model_validate(t) for t in self.audio_repo.list_all()]
 
     def upload(
         self, file_bytes: bytes, filename: str, tag_names: list[str]
-    ) -> AudioView:
+    ) -> AudioRead:
         validate_media(filename, allowed=ALLOWED_AUDIO_EXTENSIONS)
         saved_path = self.storage.save(file_bytes, Path(filename).name)
         track = self.audio_repo.create(
@@ -44,12 +44,12 @@ class AudioService:
         track.tags = list(self.tag_repo.get_or_create_by_names(tag_names))
         self.db.commit()
         self.db.refresh(track)
-        return AudioView.model_validate(track)
+        return AudioRead.model_validate(track)
 
-    def upload_multiple(self, files: list[tuple[bytes, str]]) -> list[AudioView]:
+    def upload_multiple(self, files: list[tuple[bytes, str]]) -> list[AudioRead]:
         for _data, filename in files:
             validate_media(filename, allowed=ALLOWED_AUDIO_EXTENSIONS)
-        results: list[AudioView] = []
+        results: list[AudioRead] = []
         for data, filename in files:
             results.append(self.upload(data, filename, []))
         return results
@@ -61,7 +61,7 @@ class AudioService:
         title: str | None,
         description: str | None,
         tag_names: list[str] | None,
-    ) -> AudioView:
+    ) -> AudioRead:
         track = self.audio_repo.get_by_id(audio_id)
         if track is None:
             raise MediaNotFound("Audio not found")
@@ -75,7 +75,7 @@ class AudioService:
         self.db.refresh(track)
         if tag_names is not None:
             self.tag_repo.delete_orphans()
-        return AudioView.model_validate(track)
+        return AudioRead.model_validate(track)
 
     def delete(self, audio_id: int) -> None:
         track = self.audio_repo.get_by_id(audio_id)

@@ -9,7 +9,7 @@ class AudioCreate(BaseModel):
     file_path: str
 
 
-class AudioView(BaseModel):
+class AudioRead(BaseModel):
     id: int
     title: str
     description: str | None = None
