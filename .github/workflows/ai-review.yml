@@ -2,7 +2,7 @@ name: ai-review
 
 on:
   pull_request:
-    branches: [refactor, master]
+    branches: [frontend, refactor, master]
   workflow_dispatch:
 
 concurrency:
@@ -33,31 +33,53 @@ jobs:
           if grep -qE '^diff --git a/backend/' /tmp/diff.txt; then
             echo "HAS_PY=true" >> "$GITHUB_ENV"
           else
-            echo "Docs-only diff — skipping model call" >> "$GITHUB_STEP_SUMMARY"
             echo "HAS_PY=false" >> "$GITHUB_ENV"
+          fi
+          if grep -qE '^diff --git a/frontend/' /tmp/diff.txt; then
+            echo "HAS_FRONTEND=true" >> "$GITHUB_ENV"
+          else
+            echo "HAS_FRONTEND=false" >> "$GITHUB_ENV"
+          fi
+          if [ "$HAS_PY" != "true" ] && [ "$HAS_FRONTEND" != "true" ]; then
+            echo "Docs-only or empty diff — skipping model call" >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Install opencode
-        if: env.HAS_PY == 'true'
+        if: env.HAS_PY == 'true' || env.HAS_FRONTEND == 'true'
         run: npm install -g opencode-ai
 
       - name: Assemble prompt (boilerplate + AGENTS.md invariants + diff)
-        if: env.HAS_PY == 'true'
+        if: env.HAS_PY == 'true' || env.HAS_FRONTEND == 'true'
         run: |
-          invariants=$(sed -n '/^## System Design/,/^## Repository Structure/p' AGENTS.md)
-          if [ -z "$invariants" ]; then
-            echo "::error::invariant section not found in AGENTS.md — failing closed"
+          backend_invariants=""
+          frontend_invariants=""
+          if [ "$HAS_PY" = "true" ]; then
+            backend_invariants=$(sed -n '/^## System Design/,/^## Repository Structure/p' AGENTS.md)
+          fi
+          if [ "$HAS_FRONTEND" = "true" ]; then
+            frontend_invariants=$(sed -n '/^## Frontend System Design/,/^## Best Practices/p' AGENTS.md)
+          fi
+          fail_closed=false
+          if [ "$HAS_PY" = "true" ] && [ -z "$backend_invariants" ]; then fail_closed=true; fi
+          if [ "$HAS_FRONTEND" = "true" ] && [ -z "$frontend_invariants" ]; then fail_closed=true; fi
+          if [ "$fail_closed" = "true" ]; then
+            echo "::error::invariant section not found in AGENTS.md (backend extraction: '$backend_invariants'; frontend extraction: '$frontend_invariants') — failing closed"
             exit 1
           fi
           {
             cat .github/ai-review-prompt.md
-            printf '\n## The binding invariants (extracted from AGENTS.md)\n\n%s\n\n' "$invariants"
+            if [ -n "$backend_invariants" ]; then
+              printf '\n## Backend binding invariants (extracted from AGENTS.md)\n\n%s\n\n' "$backend_invariants"
+            fi
+            if [ -n "$frontend_invariants" ]; then
+              printf '## Frontend binding invariants (extracted from AGENTS.md)\n\n%s\n\n' "$frontend_invariants"
+            fi
             printf '# BEGIN DIFF\n'
             head -c 200000 /tmp/diff.txt
           } > /tmp/prompt.txt
 
       - name: Run invariant audit (fail-closed)
-        if: env.HAS_PY == 'true'
+        if: env.HAS_PY == 'true' || env.HAS_FRONTEND == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -97,7 +119,7 @@ jobs:
           fi
 
       - name: Post audit report as PR comment
-        if: always() && env.HAS_PY == 'true'
+        if: always() && (env.HAS_PY == 'true' || env.HAS_FRONTEND == 'true')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

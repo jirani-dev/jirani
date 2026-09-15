@@ -1,14 +1,15 @@
 # Executable mirror of AGENTS.md § Build & Test Commands (check variant), scoped to
-# changed Python files. Lint/format/type config lives in backend/pyproject.toml.
+# changed files. Backend lint/format/type/test config lives in backend/pyproject.toml;
+# frontend lint lives in frontend/eslint.config.js, type in frontend/tsconfig.app.json.
 # Docs-only PRs skip the test step (see "Detect docs-only change") — the job still
 # runs so the required `quality` check always reports.
 name: ci
 
 on:
   pull_request:
-    branches: [refactor, master]
+    branches: [frontend, refactor, master]
   push:
-    branches: [refactor, master]
+    branches: [frontend, refactor, master]
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -102,6 +103,44 @@ jobs:
         working-directory: backend
         run: uv run pytest
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Resolve changed frontend files
+        id: front
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            range="origin/${{ github.event.pull_request.base.ref }}...HEAD"
+          elif [ -n "${{ github.event.before }}" ] && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
+            range="${{ github.event.before }}...HEAD"
+          else
+            echo "Branch-creation push — no diff basis, skipping scoped checks"
+            range=""
+          fi
+          if [ -n "$range" ] && [ -n "$(git diff --name-only --diff-filter=d "$range" -- 'frontend/**' || true)" ]; then
+            echo "has=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install frontend dependencies (npm ci)
+        if: steps.front.outputs.has == 'true'
+        working-directory: frontend
+        run: npm ci
+
+      - name: Frontend lint
+        if: steps.front.outputs.has == 'true'
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Frontend type check
+        if: steps.front.outputs.has == 'true'
+        working-directory: frontend
+        run: npx tsc --noEmit
+
+      # vitest run steps added when vitest lands (2026-09-15 deferral)
+
   docker-build:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -110,3 +149,7 @@ jobs:
 
       - name: Build backend image
         run: docker build -f backend/Dockerfile .
+
+      - name: Build frontend image (when Dockerfile exists)
+        if: hashFiles('frontend/Dockerfile') != ''
+        run: docker build -f frontend/Dockerfile .
