@@ -3,7 +3,7 @@
  * Reusable table component for displaying lists with action buttons
  * Used in MediaManagement, UserManagement, Analytics
  */
-export function DataTable({ columns, rows, onRowAction }) {
+export function DataTable({ columns, rows }) {
   return (
     <div className="overflow-x-auto rounded-lg shadow">
       <table className="w-full">
