@@ -44,4 +44,4 @@ repos:
       - id: no-commit-to-branch
         args: [--branch, master, --branch, refactor]
 
-exclude: '^(graphify-out/|\.venv/|node_modules/|backend/\.venv/)'
+exclude: '^(graphify-out/|\.venv/|node_modules/|backend/\.venv/|\.opencode/skills/)'

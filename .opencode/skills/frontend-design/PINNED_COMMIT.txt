@@ -1,0 +1,1 @@
+34040c9c568585f6929bedeaad110ad08f079624  2026-09-10  anthropics/skills  skills/frontend-design/
