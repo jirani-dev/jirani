@@ -89,7 +89,7 @@ src/
 
 ### AuthContext API
 ```javascript
-const { 
+const {
   isAuthenticated,  // bool
   user,            // { email, id, fullName }
   role,            // 'student' | 'teacher' | 'admin' | null

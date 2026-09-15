@@ -18,7 +18,7 @@ services:
       timeout: 5s
       retries: 5
 
-  jirani-backend:
+  backend:
     build:
       context: .
       dockerfile: backend/Dockerfile
@@ -28,13 +28,26 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    ports:
-      - "8000:8000"
     environment:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/jirani_library
       DEBUG: "true"
+      STUDENT_DEFAULT_PASSWORD: student123
+      TEACHER_DEFAULT_PASSWORD: teacher123
     volumes:
       - ./uploads:/app/uploads
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: jirani_nginx
+    platform: ${DOCKER_PLATFORM:-linux/amd64}
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./uploads:/srv/uploads:ro
 
 volumes:
   postgres_data:

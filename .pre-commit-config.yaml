@@ -1,0 +1,47 @@
+# Hooks run on every commit. Install once: `uv tool install pre-commit && pre-commit install`
+# (installs both hook types below). CONTRIBUTING.md documents the commit convention
+# the commit-msg hooks enforce; AGENTS.md § Build & Test Commands owns the DoD.
+default_install_hook_types: [pre-commit, commit-msg]
+
+repos:
+  - repo: local
+    hooks:
+      # ruff from backend/uv.lock — one ruff for hooks, DoD, and CI. No rev to drift.
+      # --project selects backend/.venv without changing cwd, so the repo-relative
+      # paths pre-commit passes still resolve and ruff finds backend/pyproject.toml.
+      - id: ruff
+        name: ruff check (locked)
+        entry: uv run --project backend ruff check --fix --force-exclude
+        language: system
+        types_or: [python, pyi]
+      - id: ruff-format
+        name: ruff format (locked)
+        entry: uv run --project backend ruff format --force-exclude
+        language: system
+        types_or: [python, pyi]
+      # Commit convention. The regex here is the one CONTRIBUTING.md documents.
+      - id: commit-msg-type
+        name: commit subject has a type prefix
+        entry: '\A(?:(?:feat|fix|test|refactor|chore|ci|docs|build|perf|revert)(?:\([a-z0-9/_.-]+\))?!?: \S|Merge |Revert "|fixup! |squash! )'
+        language: pygrep
+        args: [--negate, --multiline]
+        stages: [commit-msg]
+      - id: commit-msg-length
+        name: commit subject is at most 72 characters
+        entry: '\A[^\n]{73,}'
+        language: pygrep
+        args: [--multiline]
+        stages: [commit-msg]
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: no-commit-to-branch
+        args: [--branch, master, --branch, refactor]
+
+exclude: '^(graphify-out/|\.venv/|node_modules/|backend/\.venv/)'
