@@ -25,9 +25,7 @@ the library depends on a connection to the outside world.
 - **Honest engineering.** A layered architecture (router → service →
   repository → model), tests that run on real PostgreSQL, and every change
   gated by automated review and CI before merge.
-- **AI-assisted, human-confirmed.** The repo is developed alongside an AI
-  agent that edits application source only with a human confirming each
-  edit. AI proposes; people decide.
+
 
 ## How it works
 
