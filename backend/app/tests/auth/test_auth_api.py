@@ -126,6 +126,21 @@ def test_admin_reset_of_student_keeps_first_login_true(
     assert victim_login["first_login"] is True
 
 
+def test_reset_password_missing_account_returns_404(
+    client: TestClient, setup_paths: Path
+) -> None:
+    admin_pw = setup_admin(client, setup_paths)
+    token = login(client, "admin", admin_pw)["access_token"]
+
+    response = client.post(
+        "/auth/reset-password",
+        json={"account_id": 99999},
+        headers=auth_headers(token),
+    )
+
+    assert response.status_code == 404, response.text
+
+
 def test_admin_reset_of_teacher_returns_default_password(
     client: TestClient, setup_paths: Path
 ) -> None:

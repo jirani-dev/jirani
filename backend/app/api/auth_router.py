@@ -61,7 +61,7 @@ async def reset_password(
             "message": f"Password reset for {updated.username}",
             "new_password": password,
         }
-    except ValueError as e:
+    except UserNotFound as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e)) from e
