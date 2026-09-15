@@ -14,10 +14,10 @@ DBEnv = tuple[FastAPI, ModuleType]
 
 @pytest.fixture(scope="session")
 def db_env() -> Generator[DBEnv]:
-    import app.api.setup_router as setup_router_module
     import app.main
+    import app.services.setup_service as setup_service_module
 
-    yield app.main.app, setup_router_module
+    yield app.main.app, setup_service_module
 
 
 @pytest.fixture(autouse=True)
@@ -47,13 +47,13 @@ def db(db_env: DBEnv) -> Generator[Session]:
 
 @pytest.fixture()
 def setup_paths(db_env: DBEnv, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
-    _, setup_router_module = db_env
-    monkeypatch.setattr(setup_router_module, "DATA_DIR", tmp_path)
+    _, setup_service_module = db_env
+    monkeypatch.setattr(setup_service_module, "DATA_DIR", tmp_path)
     monkeypatch.setattr(
-        setup_router_module, "CREDENTIALS_FILE", tmp_path / ".credentials"
+        setup_service_module, "CREDENTIALS_FILE", tmp_path / ".credentials"
     )
     monkeypatch.setattr(
-        setup_router_module, "REVEALED_FLAG", tmp_path / ".credentials_revealed"
+        setup_service_module, "REVEALED_FLAG", tmp_path / ".credentials_revealed"
     )
     return tmp_path
 
