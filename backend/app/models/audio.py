@@ -1,17 +1,25 @@
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
-from sqlalchemy import Column, DateTime, Integer, String
-from sqlalchemy.orm import relationship
+from sqlalchemy import DateTime, Integer, String
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+
+if TYPE_CHECKING:
+    from app.models.tag import Tag
 
 
 class Audio(Base):
     __tablename__ = "audio"
-    id = Column(Integer, primary_key=True, index=True)
-    title = Column(String, nullable=False)
-    description = Column(String, nullable=True)
-    file_path = Column(String, nullable=False)
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
-    deleted_at = Column(DateTime, nullable=True, default=None)
-    tags = relationship("Tag", secondary="audio_tags", back_populates="audio_tracks")
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    title: Mapped[str] = mapped_column(String, nullable=False)
+    description: Mapped[str | None] = mapped_column(String, nullable=True)
+    file_path: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime | None] = mapped_column(
+        DateTime, default=lambda: datetime.now(UTC)
+    )
+    tags: Mapped[list["Tag"]] = relationship(
+        "Tag", secondary="audio_tags", back_populates="audio_tracks"
+    )

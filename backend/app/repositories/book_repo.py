@@ -6,7 +6,8 @@ from app.models import Book, Tag
 from app.repositories.author_repo import AuthorRepo
 from app.repositories.genre_repo import GenreRepo
 from app.repositories.level_repo import LevelRepo
-from app.schemas.book_schema import BookCreate, BookRead, BookSearchCriteria, Page
+from app.repositories.tag_repo import TagRepo
+from app.schemas.book_schema import BookCreate, BookSearchCriteria
 from app.services.book_errors import BookNotFound
 
 
@@ -60,14 +61,9 @@ class BookRepo:
             self.db_session.scalars(select(Book).options(selectinload(Book.tags))).all()
         )
 
-    def _delete_orphan_tags(self) -> None:
-        orphans = self.db_session.scalars(select(Tag).where(~Tag.books.any())).all()
-        for tag in orphans:
-            self.db_session.delete(tag)
-
     def cleanup_orphan_tags(self) -> None:
         try:
-            self._delete_orphan_tags()
+            TagRepo(self.db_session).delete_orphans()
             self.db_session.commit()
         except IntegrityError:
             self.db_session.rollback()
@@ -80,7 +76,7 @@ class BookRepo:
         try:
             self.db_session.delete(book)
             self.db_session.flush()
-            self._delete_orphan_tags()
+            TagRepo(self.db_session).delete_orphans()
             self.db_session.commit()
         except IntegrityError:
             self.db_session.rollback()
@@ -118,7 +114,7 @@ class BookRepo:
 
     def search(
         self, criteria: BookSearchCriteria, *, limit: int, offset: int
-    ) -> Page[BookRead]:
+    ) -> tuple[list[Book], int]:
         stmt = select(Book).options(
             selectinload(Book.tags),
             selectinload(Book.author),
@@ -157,5 +153,4 @@ class BookRepo:
             .offset(offset)
         )
         books = list(self.db_session.execute(stmt).scalars().all())
-        items: list[BookRead] = [BookRead.model_validate(book) for book in books]
-        return Page[BookRead](items=items, total=total, limit=limit, offset=offset)
+        return books, total

@@ -6,7 +6,7 @@ from passlib.context import CryptContext
 
 from app.config import settings
 from app.models import Account, RoleEnum
-from app.repositories import AuthRepo
+from app.repositories.auth_repo import AuthRepo
 from app.schemas import (
     AccountCreateRequest,
     AccountRead,
@@ -14,6 +14,7 @@ from app.schemas import (
     BulkCreateResponse,
     BulkCredentialItem,
 )
+from app.services.auth_errors import UserNotFound
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 ACCESS_TOKEN_EXPIRE_MINUTES = 120
@@ -137,7 +138,7 @@ class AuthService:
     ) -> tuple[Account, str]:
         user = self.auth_repo.get_by_id(account_id)
         if not user:
-            raise ValueError(f"User with ID '{account_id}' not found.")
+            raise UserNotFound(f"User with ID '{account_id}' not found.")
         if user.role != RoleEnum.student and user.role != RoleEnum.teacher:
             raise PermissionError("You cannot reset password for admin account.")
         if user.role == RoleEnum.student:
@@ -155,7 +156,7 @@ class AuthService:
     def setup_admin_account(self, password: str) -> Account:
         admin_user = self.get_user_by_username("admin")
         if admin_user:
-            raise ValueError("Admin account already exists.")
+            raise PermissionError("Admin account already exists.")
         hashed_password = self.get_password_hash(password)
         new_admin = Account(
             username="admin",
@@ -223,5 +224,5 @@ class AuthService:
 
     def get_user_by_id(self, user_id: int) -> AccountRead:
         if not (account := self.auth_repo.get_by_id(user_id)):
-            raise ValueError("User not found")
+            raise UserNotFound("User not found")
         return AccountRead.model_validate(account)

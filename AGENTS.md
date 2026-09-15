@@ -106,12 +106,12 @@ Six rules. Breaking one requires explicit approval, and you must say which one y
 
 | # | Invariant | Violating today |
 |---|---|---|
-| 1 | **Layering:** router → service → repository → model. Routers never open a session or query directly. Repositories never raise `HTTPException`. Business rules live in services. | `audio_router` — inline DB access and tag logic, no service layer *(video/tag closed by media plan Tasks 6/8, 2026-09-13/14; audio deferred to its own future plan)* |
+| 1 | **Layering:** router → service → repository → model. Routers never open a session or query directly. Repositories never raise `HTTPException`. Business rules live in services. | — (video/tag closed by media plan Tasks 6/8, 2026-09-13/14; audio closed by audio plan Tasks 2–3, 2026-09-14) |
 | 2 | **Error mapping:** services raise domain exceptions; **only routers** translate them. `ValueError`→400, `PermissionError`→403, not-found→404, `IntegrityError`→400. The same rule returns the same status on every endpoint. | — (closed by hygiene A2, 2026-08-26) |
 | 3 | **No CWD-relative file I/O.** Every filesystem path derives from `app/config.py` settings anchored to `BASE_DIR`. Never a bare relative string. | — (closed by hygiene S3; routers read `settings.AUDIO_DIR`/`VIDEO_DIR`, `config.py:42-43`) |
-| 4 | **SQLAlchemy 2.0** (`Mapped[]`, `mapped_column`, `select()`) in all new or modified code. Legacy 1.x is grandfathered only until its module gets tests. | `Audio`/`AudioTag` models; `AudioRepo` still uses `query()` *(video/book/tag closed by media plan Tasks 5/6/8)* |
-| 5 | **Tests run on PostgreSQL** via testcontainers — never SQLite (JSONB/GIN are not expressible there). Never delete a failing test to go green. Write characterization tests before refactoring untested code. TDD per the `test-driven-development` skill (superpowers): characterization first on legacy code, red-green-refactor for new behavior and bugfixes. | audio module has zero tests *(book/video/tag covered by media plan Tasks 5/6/8)* |
-| 6 | **Naming:** `PascalCase` classes with no underscores (ruff `N801`); `snake_case` for functions and modules. The full convention is the Naming table under Repository Structure. | `Audio_Repo`, `Audio_Create`, `Audio_View` *(video rows closed by media plan Task 8)* |
+| 4 | **SQLAlchemy 2.0** (`Mapped[]`, `mapped_column`, `select()`) in all new or modified code. Legacy 1.x is grandfathered only until its module gets tests. | — (video/book/tag closed by media plan Tasks 5/6/8; audio closed by audio plan Task 3, 2026-09-14) |
+| 5 | **Tests run on PostgreSQL** via testcontainers — never SQLite (JSONB/GIN are not expressible there). Never delete a failing test to go green. Write characterization tests before refactoring untested code. TDD per the `test-driven-development` skill (superpowers): characterization first on legacy code, red-green-refactor for new behavior and bugfixes. | — (book/video/tag covered by media plan Tasks 5/6/8; audio covered by audio plan Tasks 1/3, 2026-09-14) |
+| 6 | **Naming:** `PascalCase` classes with no underscores (ruff `N801`); `snake_case` for functions and modules. The full convention is the Naming table under Repository Structure. | — (video rows closed by media plan Task 8; audio rows closed by audio plan Task 3, 2026-09-14) |
 
 ## Repository Structure
 
@@ -141,9 +141,9 @@ Invariant 6 is the enforceable core; this table is the full convention. Where th
 
 | Thing | Rule | Today |
 |---|---|---|
-| Classes | `PascalCase`, no underscores (ruff `N801`) | audio classes in `per-file-ignores` |
-| Schemas | `<Entity>Base / Create / Read / Update`; request/response pairs `<Verb><Noun>Request / Response`; paged lists `Page[T]` | consistent outside audio |
-| Route prefixes | plural noun: `/books`, `/videos`, `/tags`, `/authors` | `/audio` — audio plan |
+| Classes | `PascalCase`, no underscores (ruff `N801`) | consistent |
+| Schemas | `<Entity>Base / Create / Read / Update`; request/response pairs `<Verb><Noun>Request / Response`; paged lists `Page[T]` | consistent |
+| Route prefixes | plural noun: `/books`, `/videos`, `/tags`, `/authors` | `/audio` kept (mass noun; locked by audio plan, 2026-09-14) |
 | Handlers | `list_<plural>`, `get_<singular>`, `upload_<singular>`, `update_<singular>`, `delete_<singular>`, `stream_<singular>` | `get_all_tags`, `get_videos`, `upload_file` — rename when touched |
 | Domain exceptions | `<Noun><State>` with no `Error` suffix (`BookNotFound`, `InvalidMediaFile`); base classes `<Area>Error` (`BookError`, `MediaError`). ruff `N818` is ignored for this reason. | consistent |
 | Services / repos | `<Entity>Service`, `<Entity>Repo`; leaf helpers named for what they do (`ContentValidator`, `MediaFileStorage`) | consistent |
@@ -205,7 +205,7 @@ uv run pytest
 Notes that make the difference between these working and not:
 
 - **`uv run` is mandatory.** A bare `pytest` or `ruff` uses whatever is on PATH, not `backend/.venv`.
-- **mypy on changed files only.** `mypy . --strict` across the repo surfaces pre-existing debt unrelated to your change (audio module). Test modules run under a relaxed per-module override in `pyproject.toml`; app code is fully strict.
+- **mypy on changed files only.** `mypy . --strict` across the repo can surface debt in files unrelated to your change. Test modules run under a relaxed per-module override in `pyproject.toml`; app code is fully strict.
 - **Tests need a running Docker daemon** — the testcontainers harness starts its own `postgres:16-alpine`. You do **not** need `docker compose up -d db` for tests. Verbosity is set by `addopts` in `pyproject.toml`; do not add `-v`/`-q` by hand.
 - **CI runs the check variant on changed Python files only** (`ci.yml` "Resolve changed Python files"); the `review` agent runs it on `.`.
 

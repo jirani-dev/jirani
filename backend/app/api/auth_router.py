@@ -18,6 +18,7 @@ from app.schemas import (
     TokenResponse,
 )
 from app.services import AuthService
+from app.services.auth_errors import UserNotFound
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
 
@@ -60,7 +61,7 @@ async def reset_password(
             "message": f"Password reset for {updated.username}",
             "new_password": password,
         }
-    except ValueError as e:
+    except UserNotFound as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e)) from e
@@ -127,7 +128,7 @@ async def bulk_create_users(
 
 
 @router.get("/users", status_code=status.HTTP_200_OK)
-async def get_all_users(
+async def list_users(
     current_user: Account = Depends(RoleChecker([RoleEnum.teacher, RoleEnum.admin])),
     auth_service: AuthService = Depends(get_auth_service),
 ) -> list[AccountRead]:
@@ -141,5 +142,5 @@ async def get_user_by_id(
 ) -> AccountRead:
     try:
         return auth_service.get_user_by_id(current_user.id)
-    except ValueError as e:
+    except UserNotFound as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e

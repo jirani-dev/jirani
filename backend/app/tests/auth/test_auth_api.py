@@ -5,6 +5,7 @@ from typing import Any, cast
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from app.models.account import Account
 from app.tests.conftest import auth_headers, login, setup_admin
 
 
@@ -123,6 +124,21 @@ def test_admin_reset_of_student_keeps_first_login_true(
 
     victim_login = login(client, student["username"], new_password)
     assert victim_login["first_login"] is True
+
+
+def test_reset_password_missing_account_returns_404(
+    client: TestClient, setup_paths: Path
+) -> None:
+    admin_pw = setup_admin(client, setup_paths)
+    token = login(client, "admin", admin_pw)["access_token"]
+
+    response = client.post(
+        "/auth/reset-password",
+        json={"account_id": 99999},
+        headers=auth_headers(token),
+    )
+
+    assert response.status_code == 404, response.text
 
 
 def test_admin_reset_of_teacher_returns_default_password(
@@ -252,6 +268,27 @@ def test_me_without_token_rejected(client: TestClient, setup_paths: Path) -> Non
     setup_admin(client, setup_paths)
     response = client.get("/auth/me")
     assert response.status_code in [401, 403]
+
+
+def test_me_returns_401_when_account_deleted(
+    client: TestClient, setup_paths: Path, db: Session
+) -> None:
+    admin_pw = setup_admin(client, setup_paths)
+    admin_token = login(client, "admin", admin_pw)["access_token"]
+
+    ghost_pw = _create_teacher(client, admin_token, "ghost")
+    ghost_token = login(client, "ghost", ghost_pw)["access_token"]
+    ghost_id = _account_id(client, admin_token, "ghost")
+
+    account = db.get(Account, ghost_id)
+    assert account is not None
+    db.delete(account)
+    db.commit()
+
+    response = client.get("/auth/me", headers=auth_headers(ghost_token))
+
+    assert response.status_code == 401, response.text
+    assert response.json()["detail"] == "couldn't validate credentials"
 
 
 def test_create_student_by_admin(client: TestClient, setup_paths: Path) -> None:
