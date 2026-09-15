@@ -21,7 +21,7 @@ export async function apiFetch(path: string, init: RequestInit = {}): Promise<Re
     const headers = new Headers(init.headers);
     if (token) headers.set('Authorization', `Bearer ${token}`);
 
-    const res = await fetch(`${API_BASE}${path}`, { ...init, headers });
+    const res = await fetch(`${API_BASE}${path}`, { ...init, headers, credentials: 'include' });
 
     if (res.status === 401) {
         localStorage.removeItem('auth');

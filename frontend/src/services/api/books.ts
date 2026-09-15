@@ -1,6 +1,8 @@
-// src/services/api/books.ts
+import * as pdfjsLib from 'pdfjs-dist';
 import { apiFetch, parseErrorDetail } from './client';
 import { Book, Page } from '../../types';
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 
 const BASE = '/books';
 

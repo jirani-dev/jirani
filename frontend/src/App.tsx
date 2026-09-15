@@ -3,6 +3,7 @@ import Home from './pages/Home'
 import Library from './pages/Library'
 import ReadBook from './pages/Book'
 import Video from './pages/Video'
+import Setup from './pages/Setup'
 
 function App() {
     return (
@@ -11,6 +12,7 @@ function App() {
             <Route path="/library" element={<Library />} />
             <Route path="/read/:uid" element={<ReadBook />} />
             <Route path="/video" element={<Video />} />
+            <Route path="/setup" element={<Setup />} />
         </Routes>
     )
 }

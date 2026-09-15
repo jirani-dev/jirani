@@ -1,7 +1,9 @@
+// src/hooks/usePdfViewer.ts
 import { useState, useEffect, useRef, useCallback, RefObject } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
 import type { PDFDocumentProxy, RenderTask } from 'pdfjs-dist';
 import { getBookReadUrl } from '../services/api/books';
+import { apiFetch } from '../services/api/client';
 
 interface UsePdfViewerResult {
     loading: boolean;
@@ -53,7 +55,18 @@ export function usePdfViewer(
             try {
                 setLoading(true);
                 setError(null);
-                const pdf = await pdfjsLib.getDocument(getBookReadUrl(uid ?? '')).promise;
+
+                // PDF.js's getDocument(url) does its own internal fetch and
+                // never sends our Authorization header. /books/{uid}/read
+                // requires auth, so we fetch the bytes ourselves (via
+                // apiFetch) and hand PDF.js the raw data instead of a URL.
+                const res = await apiFetch(getBookReadUrl(uid ?? ''));
+                if (!res.ok) {
+                    throw new Error(`Failed to fetch book (${res.status})`);
+                }
+                const arrayBuffer = await res.arrayBuffer();
+
+                const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
                 if (cancelled) return;
                 pdfRef.current = pdf;
                 setTotalPages(pdf.numPages);

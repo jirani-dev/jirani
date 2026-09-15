@@ -1,11 +1,12 @@
 // src/services/api/videos.ts
 import { apiFetch, parseErrorDetail } from './client';
 import { Video } from '../../types';
+import API_BASE from '../../config';
 
 const BASE = '/videos';
 
 export function getVideoStreamUrl(id: Video['id']): string {
-    return `${BASE}/stream/${id}`;
+    return `${API_BASE}${BASE}/stream/${id}`;
 }
 
 export async function fetchVideos(): Promise<Video[]> {
