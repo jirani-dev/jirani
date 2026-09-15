@@ -18,6 +18,7 @@ from app.schemas import (
     TokenResponse,
 )
 from app.services import AuthService
+from app.services.auth_errors import UserNotFound
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
 
@@ -141,5 +142,5 @@ async def get_user_by_id(
 ) -> AccountRead:
     try:
         return auth_service.get_user_by_id(current_user.id)
-    except ValueError as e:
+    except UserNotFound as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
