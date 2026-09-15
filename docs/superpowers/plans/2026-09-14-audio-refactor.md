@@ -391,7 +391,7 @@ git commit -m "refactor: audio module — 2.0 models, hard delete, service layer
 - Modify: `AGENTS.md` (agent — invariant table + Naming table rows struck)
 - Modify: `README.md` (agent — zero-auth `/audio/` warning removed)
 
-- [ ] **Step 1: The migration** — human runs `cd backend && uv run alembic revision --rev-id "$(uuidgen | cut -c1-12)" -m "audio hard delete"` and pastes this body (`down_revision` **must** be `c5a1e8b4d9f2`, the current head):
+- [ ] **Step 1: The migration** — human runs `cd backend && uv run alembic revision --rev-id "$(uuidgen | tr '[:upper:]' '[:lower:]' | tr -d '-' | cut -c1-12)" -m "audio hard delete"` (strip hyphens — `uuidgen`'s output has one at position 9 and Alembic rejects `-` in revision ids; the media plan's `cut -c1-12` alone was buggy) and pastes this body (`down_revision` **must** be `c5a1e8b4d9f2`, the current head):
 
 ```python
 """audio hard delete: drop audio.deleted_at
