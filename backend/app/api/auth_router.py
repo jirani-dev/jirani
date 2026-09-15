@@ -44,10 +44,10 @@ async def login(
     response.set_cookie(
         key="access_token",
         value=access_token,
-        httponly=True,       # JS can't read it — mitigates XSS token theft
-        secure=False,        # plain http:// on your LAN — set True only if you add TLS
-        samesite="lax",      # sent on normal navigation/same-site requests
-        max_age=60 * 60 * 2, # matches ACCESS_TOKEN_EXPIRE_MINUTES (120 min)
+        httponly=True,  # JS can't read it — mitigates XSS token theft
+        secure=False,  # plain http:// on your LAN — set True only if you add TLS
+        samesite="lax",  # sent on normal navigation/same-site requests
+        max_age=60 * 60 * 2,  # matches ACCESS_TOKEN_EXPIRE_MINUTES (120 min)
     )
 
     return TokenResponse(
