@@ -6,7 +6,7 @@ from passlib.context import CryptContext
 
 from app.config import settings
 from app.models import Account, RoleEnum
-from app.repositories import AuthRepo
+from app.repositories.auth_repo import AuthRepo
 from app.schemas import (
     AccountCreateRequest,
     AccountRead,

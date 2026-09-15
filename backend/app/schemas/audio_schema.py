@@ -1,18 +1,21 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, computed_field
 
 from app.schemas.tag_schema import TagRead
 
 
-class Audio_Create(BaseModel):
+class AudioCreate(BaseModel):
     title: str
     description: str | None = None
-    file_path: str  # no tags here — tags handled separately in router
+    file_path: str
 
 
-class Audio_View(BaseModel):
+class AudioView(BaseModel):
     id: int
     title: str
     description: str | None = None
-    audio_url: str
     tags: list[TagRead] = []
     model_config = ConfigDict(from_attributes=True)
+
+    @computed_field
+    def audio_url(self) -> str:
+        return f"/audio/stream/{self.id}"

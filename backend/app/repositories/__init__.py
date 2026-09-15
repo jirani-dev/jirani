@@ -1,3 +1,4 @@
+from .audio_repo import AudioRepo
 from .auth_repo import AuthRepo
 from .author_repo import AuthorRepo
 from .book_repo import BookRepo
@@ -8,6 +9,7 @@ from .video_repo import VideoRepo
 
 __all__ = [
     "AuthRepo",
+    "AudioRepo",
     "AuthorRepo",
     "BookRepo",
     "GenreRepo",

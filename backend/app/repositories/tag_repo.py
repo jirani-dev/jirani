@@ -11,7 +11,9 @@ class TagRepo:
     def delete_orphans(self) -> int:
         orphan_ids = list(
             self.db_session.scalars(
-                select(Tag.id).where(~Tag.books.any(), ~Tag.videos.any())
+                select(Tag.id).where(
+                    ~Tag.books.any(), ~Tag.videos.any(), ~Tag.audio_tracks.any()
+                )
             ).all()
         )
         if not orphan_ids:

@@ -3,7 +3,7 @@ import uuid
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models import Author, Book, Genre, Level, Tag, Video
+from app.models import Audio, Author, Book, Genre, Level, Tag, Video
 from app.repositories.author_repo import AuthorRepo
 from app.repositories.book_repo import BookRepo
 from app.repositories.genre_repo import GenreRepo
@@ -162,3 +162,56 @@ def test_search_purity_guard(db: Session) -> None:
         _table_count(db, Genre),
     )
     assert counts_after == counts_before
+
+
+def _seed_audio_with_tag(db: Session, *, title: str, tag: Tag) -> Audio:
+    audio = Audio(title=title, description=None, file_path="/tmp/nonexistent.mp3")
+    db.add(audio)
+    db.flush()
+    audio.tags.append(tag)
+    db.commit()
+    return audio
+
+
+def test_delete_video_spares_audio_linked_tag(db: Session) -> None:
+    tag = TagRepo(db).get_or_create_by_names(["audio_video"])[0]
+    _seed_audio_with_tag(db, title="track", tag=tag)
+    video = Video(title="av", description=None, file_path="/tmp/nonexistent.mp4")
+    db.add(video)
+    db.flush()
+    video.tags.append(tag)
+    db.commit()
+    VideoService(db).delete(video.id)
+    db.expire_all()
+    assert _count_by_name(db, Tag, "audio_video") == 1
+
+
+def test_delete_video_spares_book_linked_tag(db: Session) -> None:
+    tag = TagRepo(db).get_or_create_by_names(["book_video"])[0]
+    book = _create_book(db, title="BV", tags=["book_video"])
+    video = Video(title="bv", description=None, file_path="/tmp/nonexistent.mp4")
+    db.add(video)
+    db.flush()
+    video.tags.append(tag)
+    db.commit()
+    VideoService(db).delete(video.id)
+    db.expire_all()
+    assert _count_by_name(db, Tag, "book_video") == 1
+    assert [t.name for t in book.tags] == ["book_video"]
+
+
+def test_delete_orphans_spares_audio_only_tag(db: Session) -> None:
+    tag = TagRepo(db).get_or_create_by_names(["audio_only"])[0]
+    _seed_audio_with_tag(db, title="solo", tag=tag)
+    deleted = TagRepo(db).delete_orphans()
+    db.expire_all()
+    assert deleted == 0
+    assert _count_by_name(db, Tag, "audio_only") == 1
+
+
+def test_delete_orphans_deletes_unlinked_tag(db: Session) -> None:
+    TagRepo(db).get_or_create_by_names(["fully_orphaned"])
+    deleted = TagRepo(db).delete_orphans()
+    db.expire_all()
+    assert deleted == 1
+    assert _count_by_name(db, Tag, "fully_orphaned") == 0

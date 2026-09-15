@@ -49,9 +49,6 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 # Known debt from the AGENTS.md invariant table, machine-readable.
 # Delete a line when its module is fixed; the AGENTS.md row goes with it.
-"app/repositories/audio_repo.py" = ["N801"]  # Audio_Repo (Invariant 6, audio plan)
-"app/schemas/audio_schema.py" = ["N801"]     # Audio_Create, Audio_View (Invariant 6, audio plan)
-"app/api/audio_router.py" = ["E711"]         # pre-existing, audio plan
 "app/config.py" = ["N802"]                   # ALLOWED_EXTENSIONS / ALLOWED_IMAGE_EXTENSIONS are @property constants — intentional
 
 [tool.mypy]
