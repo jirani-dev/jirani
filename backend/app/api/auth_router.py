@@ -128,7 +128,7 @@ async def bulk_create_users(
 
 
 @router.get("/users", status_code=status.HTTP_200_OK)
-async def get_all_users(
+async def list_users(
     current_user: Account = Depends(RoleChecker([RoleEnum.teacher, RoleEnum.admin])),
     auth_service: AuthService = Depends(get_auth_service),
 ) -> list[AccountRead]:
