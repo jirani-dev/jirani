@@ -2,8 +2,8 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
-from app.models import Tag
 from app.models.video import Video
+from app.repositories.tag_repo import TagRepo
 from app.schemas.video_schema import VideoCreate
 from app.services.media_errors import MediaNotFound
 
@@ -36,13 +36,8 @@ class VideoRepo:
         try:
             self.db_session.delete(video)
             self.db_session.flush()
-            self._delete_orphan_tags()
+            TagRepo(self.db_session).delete_orphans()
             self.db_session.commit()
         except IntegrityError:
             self.db_session.rollback()
             raise
-
-    def _delete_orphan_tags(self) -> None:
-        orphans = self.db_session.scalars(select(Tag).where(~Tag.videos.any())).all()
-        for tag in orphans:
-            self.db_session.delete(tag)
