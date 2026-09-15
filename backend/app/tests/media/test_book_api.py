@@ -337,16 +337,20 @@ def test_search_genre_filter_and_entities(db: Session) -> None:
     _seed_book(db, uid="bk0002")
     db.commit()
 
-    page = BookRepo(db).search(BookSearchCriteria(genre="SCIFI"), limit=10, offset=0)
-    assert page.total == 1
-    assert [item.uid for item in page.items] == ["bk0001"]
-    assert page.items[0].genre == "scifi"
+    rows, total = BookRepo(db).search(
+        BookSearchCriteria(genre="SCIFI"), limit=10, offset=0
+    )
+    assert total == 1
+    assert [row.uid for row in rows] == ["bk0001"]
+    assert rows[0].genre_name == "scifi"
 
 
 def test_search_unknown_author_matches_nothing(db: Session) -> None:
     _seed_book(db, uid="bk0001")
-    page = BookRepo(db).search(BookSearchCriteria(author="nobody"), limit=10, offset=0)
-    assert page.total == 0
+    _, total = BookRepo(db).search(
+        BookSearchCriteria(author="nobody"), limit=10, offset=0
+    )
+    assert total == 0
 
 
 def test_search_tags_or_semantics_and_honest_total(db: Session) -> None:
@@ -361,21 +365,21 @@ def test_search_tags_or_semantics_and_honest_total(db: Session) -> None:
     b2.tags.append(t_math)
     db.commit()
 
-    page = BookRepo(db).search(
+    rows, total = BookRepo(db).search(
         BookSearchCriteria(tags=["Math", "ALGEBRA"]), limit=2, offset=0
     )
-    assert page.total == 2
-    assert {item.uid for item in page.items} == {"bk0001", "bk0002"}
+    assert total == 2
+    assert {row.uid for row in rows} == {"bk0001", "bk0002"}
 
 
 def test_search_metadata_containment(db: Session) -> None:
     _seed_book(db, uid="bk0001", metadata_={"publisher": "Penguin"})
     _seed_book(db, uid="bk0002", metadata_={"publisher": "Puffin"})
-    page = BookRepo(db).search(
+    rows, total = BookRepo(db).search(
         BookSearchCriteria(metadata_={"publisher": "Penguin"}), limit=10, offset=0
     )
-    assert page.total == 1
-    assert [item.uid for item in page.items] == ["bk0001"]
+    assert total == 1
+    assert [row.uid for row in rows] == ["bk0001"]
 
 
 def test_search_pagination_pages_are_disjoint_and_complete(db: Session) -> None:
@@ -385,8 +389,8 @@ def test_search_pagination_pages_are_disjoint_and_complete(db: Session) -> None:
         BookRepo(db).search(BookSearchCriteria(), limit=2, offset=off)
         for off in (0, 2, 4)
     ]
-    uid_sets = [{item.uid for item in p.items} for p in pages]
-    assert all(p.total == 5 for p in pages)
+    uid_sets = [{row.uid for row in rows} for rows, _ in pages]
+    assert all(total == 5 for _, total in pages)
     assert all(not (a & b) for a, b in zip(uid_sets, uid_sets[1:], strict=False))
     assert set().union(*uid_sets) == {f"bk{i:04d}" for i in range(5)}
 

@@ -9,7 +9,7 @@ from app.database import get_db
 from app.dependencies.auth import RoleChecker
 from app.models.account import Account
 from app.models.role_enum import RoleEnum
-from app.schemas.audio_schema import AudioView
+from app.schemas.audio_schema import AudioRead
 from app.services.audio_service import AudioService
 from app.services.media_errors import InvalidMediaFile, MediaNotFound
 
@@ -23,21 +23,21 @@ def get_audio_service(db: Session = Depends(get_db)) -> AudioService:
     return AudioService(db)
 
 
-@router.get("/", response_model=list[AudioView])
+@router.get("/", response_model=list[AudioRead])
 def list_tracks(
     svc: AudioService = Depends(get_audio_service),
     user: Account = Depends(RoleChecker(ROLES)),
-) -> list[AudioView]:
+) -> list[AudioRead]:
     return svc.list_tracks()
 
 
-@router.post("/upload", response_model=AudioView)
+@router.post("/upload", response_model=AudioRead)
 async def upload_track(
     file: UploadFile = File(...),
     tags: str = Form(""),
     svc: AudioService = Depends(get_audio_service),
     user: Account = Depends(RoleChecker(WRITE_ROLES)),
-) -> AudioView:
+) -> AudioRead:
     data = await file.read()
     tag_names = [t.strip() for t in tags.split(",") if t.strip()]
     try:
@@ -48,12 +48,12 @@ async def upload_track(
         raise HTTPException(status_code=400, detail="Invalid audio data") from exc
 
 
-@router.post("/upload_multiple", response_model=list[AudioView])
+@router.post("/upload_multiple", response_model=list[AudioRead])
 async def upload_multiple_tracks(
     files: list[UploadFile] = File(...),
     svc: AudioService = Depends(get_audio_service),
     user: Account = Depends(RoleChecker(WRITE_ROLES)),
-) -> list[AudioView]:
+) -> list[AudioRead]:
     payloads = [(await file.read(), file.filename or "") for file in files]
     try:
         return svc.upload_multiple(payloads)
@@ -63,7 +63,7 @@ async def upload_multiple_tracks(
         raise HTTPException(status_code=400, detail="Invalid audio data") from exc
 
 
-@router.patch("/{audio_id}", response_model=AudioView)
+@router.patch("/{audio_id}", response_model=AudioRead)
 def update_track(
     audio_id: int,
     title: str | None = None,
@@ -71,7 +71,7 @@ def update_track(
     tags: str | None = None,
     svc: AudioService = Depends(get_audio_service),
     user: Account = Depends(RoleChecker(WRITE_ROLES)),
-) -> AudioView:
+) -> AudioRead:
     tag_names = (
         [t.strip() for t in tags.split(",") if t.strip()] if tags is not None else None
     )

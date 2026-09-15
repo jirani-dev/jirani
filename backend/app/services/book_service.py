@@ -65,7 +65,11 @@ class BookService:
         limit: int,
         offset: int,
     ) -> Page[BookRead]:
-        return self.book_repo.search(book_search_criteria, limit=limit, offset=offset)
+        rows, total = self.book_repo.search(
+            book_search_criteria, limit=limit, offset=offset
+        )
+        items = [BookRead.model_validate(row) for row in rows]
+        return Page[BookRead](items=items, total=total, limit=limit, offset=offset)
 
     def resolve_stream(self, book_uid: str) -> tuple[Path, str]:
         book = self.book_repo.get_book_by_uid(book_uid)

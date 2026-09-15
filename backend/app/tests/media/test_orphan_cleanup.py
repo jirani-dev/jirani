@@ -153,9 +153,11 @@ def test_search_purity_guard(db: Session) -> None:
         _table_count(db, Level),
         _table_count(db, Genre),
     )
-    page = BookRepo(db).search(BookSearchCriteria(author="nobody"), limit=10, offset=0)
-    assert page.total == 0
-    assert page.items == []
+    rows, total = BookRepo(db).search(
+        BookSearchCriteria(author="nobody"), limit=10, offset=0
+    )
+    assert total == 0
+    assert rows == []
     counts_after = (
         _table_count(db, Author),
         _table_count(db, Level),
