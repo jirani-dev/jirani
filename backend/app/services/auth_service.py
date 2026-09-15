@@ -14,6 +14,7 @@ from app.schemas import (
     BulkCreateResponse,
     BulkCredentialItem,
 )
+from app.services.auth_errors import UserNotFound
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 ACCESS_TOKEN_EXPIRE_MINUTES = 120
@@ -223,5 +224,5 @@ class AuthService:
 
     def get_user_by_id(self, user_id: int) -> AccountRead:
         if not (account := self.auth_repo.get_by_id(user_id)):
-            raise ValueError("User not found")
+            raise UserNotFound("User not found")
         return AccountRead.model_validate(account)
