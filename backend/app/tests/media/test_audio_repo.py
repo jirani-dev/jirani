@@ -1,10 +1,9 @@
-from datetime import UTC, datetime, timedelta
-
 import pytest
 
 from app.models.audio import Audio
-from app.repositories.audio_repo import Audio_Repo
-from app.schemas.audio_schema import Audio_Create
+from app.repositories.audio_repo import AudioRepo
+from app.schemas.audio_schema import AudioCreate
+from app.services.media_errors import MediaError
 
 
 def _seed_audio(
@@ -17,34 +16,27 @@ def _seed_audio(
     return track
 
 
-def test_create_audio_persists(db):
-    track = Audio_Repo(db).create_audio(
-        Audio_Create(
-            title="song", description="first", file_path="/tmp/nonexistent.mp3"
-        )
+def test_create_persists(db):
+    track = AudioRepo(db).create(
+        AudioCreate(title="song", description="first", file_path="/tmp/nonexistent.mp3")
     )
     assert track.id is not None
     assert track.title == "song"
     assert track.description == "first"
     assert track.file_path == "/tmp/nonexistent.mp3"
-    assert track.deleted_at is None
+    assert track.created_at is not None  # hard-delete world: no deleted_at column
 
 
-def test_delete_audio_soft_deletes(db):
+def test_delete_hard_deletes(db):
     track = _seed_audio(db)
-    before = datetime.now(UTC).replace(tzinfo=None)
-    Audio_Repo(db).delete_audio(track.id)
-    after = datetime.now(UTC).replace(tzinfo=None)
+    AudioRepo(db).delete(track.id)
     db.expire_all()
-    row = db.query(Audio).filter(Audio.id == track.id).first()
-    assert row is not None  # soft delete keeps the row
-    assert row.deleted_at is not None
-    assert (
-        before - timedelta(seconds=5) <= row.deleted_at <= after + timedelta(seconds=5)
-    )
+    assert db.query(Audio).filter(Audio.id == track.id).first() is None
+    assert db.query(Audio).count() == 0  # row GONE, not soft-deleted
 
 
-def test_delete_audio_missing_id_raises(db):
-    # Bug pin: legacy delete_audio dereferences None.deleted_at for missing ids.
-    with pytest.raises(AttributeError):
-        Audio_Repo(db).delete_audio(999999)
+def test_delete_missing_id_raises(db):
+    # Flip of the legacy AttributeError pin: the rewritten repo raises the
+    # domain exception the service layer maps to 404.
+    with pytest.raises(MediaError, match="Audio not found"):
+        AudioRepo(db).delete(999999)
