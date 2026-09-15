@@ -16,6 +16,18 @@
     "gh_grep": {
       "type": "remote",
       "url": "https://mcp.grep.app"
+    },
+    // First-party browser MCPs — drives with Playwright, debugs with Chrome DevTools.
+    // Division of labor lives in AGENTS.md "External Knowledge & Global Search".
+    "playwright": {
+      "type": "local",
+      "command": ["npx", "@playwright/mcp@latest"],
+      "enabled": true
+    },
+    "chrome-devtools": {
+      "type": "local",
+      "command": ["npx", "-y", "chrome-devtools-mcp@latest"],
+      "enabled": true
     }
   },
   // Enforces the operating mode declared in AGENTS.md.
@@ -26,15 +38,24 @@
     "edit": {
       "*": "allow",
       // Application source — the agent edits, you confirm each edit in the TUI.
+      // Both trees share the same operating mode; backend and frontend edits are
+      // symmetric in this project.
       "backend/app/**": "ask",
+      "frontend/src/**": "ask",
       // Dependencies, packaging, schema — human hands only. The agent proposes the diff in chat.
+      // Backend: uv.lock generated, pyproject.toml never hand-edited by the agent.
       "backend/pyproject.toml": "deny",
       "backend/uv.lock": "deny",
       "backend/Dockerfile": "deny",
       "backend/alembic.ini": "deny",
       "backend/migrations/**": "deny",
       "docker-compose.yml": "deny",
-      "docker/**": "deny"
+      "docker/**": "deny",
+      // Frontend parity: package-lock.json generated, package.json never hand-edited,
+      // vite.config.* changes routed through npm (deps via `npm install`, lockfile via npm).
+      "frontend/package.json": "deny",
+      "frontend/package-lock.json": "deny",
+      "frontend/vite.config.*": "deny"
     },
     "bash": {
       "*": "allow",
@@ -52,7 +73,10 @@
       "psql*": "ask",
       // The only route to a dependency change — uv.lock is generated, pyproject is never hand-edited by the agent.
       "uv add*": "ask",
-      "uv remove*": "ask"
+      "uv remove*": "ask",
+      // Frontend parity: package-lock.json is generated, package.json is never hand-edited by the agent.
+      "npm install*": "ask",
+      "npm add*": "ask"
     }
   }
 }
