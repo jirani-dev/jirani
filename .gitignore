@@ -5,10 +5,20 @@ __pycache__/
 
 # Environments
 .env
-.venv
-env/
-venv/
-ENV/
+.env.*
+!.env.example
+
+# Tool caches (ruff/mypy/pytest also self-ignore these; explicit for fresh clones)
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+
+# Packaging and coverage artifacts
+*.egg-info/
+build/
+dist/
+.coverage
+htmlcov/
 
 # OS specific files
 .DS_Store
@@ -19,6 +29,12 @@ uploads/**
 backend/uploads/**
 *.log
 docs/codebase-structure.txt
+
+# Local compose overrides (auto-loaded by docker compose)
+docker-compose.override.yml
+
+# JavaScript (the frontend branch, when it merges)
+node_modules/
 
 # Generated briefings
 todos/
