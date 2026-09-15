@@ -1,50 +1,67 @@
-from pydantic_settings import BaseSettings, SettingsConfigDict
+import secrets
 from pathlib import Path
-from typing import Set
+from typing import Any
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+DATA_DIR = BASE_DIR / "data"
+SECRET_FILE = DATA_DIR / ".secret"
+
+
+def get_secret_key() -> str:
+    SECRET_FILE.parent.mkdir(parents=True, exist_ok=True)
+    if SECRET_FILE.exists():
+        return SECRET_FILE.read_text().strip()
+    key = secrets.token_urlsafe(32)
+    SECRET_FILE.write_text(key)
+    return key
+
 
 class Settings(BaseSettings):
     # App metadata
     APP_NAME: str = "Jirani Offline Library"
     APP_VERSION: str = "1.0.0"
     APP_DESCRIPTION: str = "Offline library management system"
-    
+
     # App settings
     DEBUG: bool = True
-    
+
     # Database settings
-    DATABASE_URL: str = "sqlite:///./data/jirani_library.db"
-    
+    DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/jirani_library"
+
     # Security settings
-    SECRET_KEY: str = "dev-secret-change-in-production"
+    SECRET_KEY: str = get_secret_key()
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
-    
-    # CORS settings
-    CORS_ORIGINS: list[str] = ["http://localhost:3000", "http://localhost:5173"]
-    CORS_ALLOW_CREDENTIALS: bool = True
-    CORS_ALLOW_METHODS: list[str] = ["*"]
-    CORS_ALLOW_HEADERS: list[str] = ["*"]
-    
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 480
+
     # File upload settings
+    DATA_DIR: Path = BASE_DIR / "data"
     UPLOAD_DIR: Path = BASE_DIR / "uploads" / "books"
     COVER_DIR: Path = BASE_DIR / "uploads" / "covers"
+    AUDIO_DIR: Path = BASE_DIR / "uploads" / "audio"
+    VIDEO_DIR: Path = BASE_DIR / "uploads" / "videos"
     MAX_UPLOAD_SIZE: int = 50 * 1024 * 1024  # 50MB
     MAX_COVER_SIZE: int = 5 * 1024 * 1024  # 5MB
 
+    # Default credentials
+    STUDENT_DEFAULT_PASSWORD: str = "student123"
+    TEACHER_DEFAULT_PASSWORD: str = "teacher123"
+
     @property
-    def ALLOWED_EXTENSIONS(self) -> Set[str]:
+    def ALLOWED_EXTENSIONS(self) -> set[str]:
         return {"pdf", "epub"}
-    
+
     @property
-    def ALLOWED_IMAGE_EXTENSIONS(self) -> Set[str]:
+    def ALLOWED_IMAGE_EXTENSIONS(self) -> set[str]:
         return {"jpg", "jpeg", "png", "webp"}
 
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        case_sensitive=True
-    )
+    model_config = SettingsConfigDict(case_sensitive=True)
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        if not self.SECRET_KEY:
+            self.SECRET_KEY = get_secret_key()
+
 
 settings = Settings()

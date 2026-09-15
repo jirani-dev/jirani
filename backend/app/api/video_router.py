@@ -1,134 +1,123 @@
-from fastapi import APIRouter, File, UploadFile, Form, Depends, HTTPException
-from app.schemas.video_schema import Video_Create, Video_View
-from app.repositories.video_repo import Video_Repo
-from sqlalchemy.orm import Session, joinedload
-from app.models.video import Video
-from app.models.tag import Tag
-import os, shutil, uuid, asyncio, mimetypes
-from fastapi.responses import StreamingResponse
+from urllib.parse import quote
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi.responses import Response
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
 from app.database import get_db
-from pathlib import Path
-from typing import Optional
+from app.dependencies.auth import RoleChecker
+from app.models.account import Account
+from app.models.role_enum import RoleEnum
+from app.schemas.video_schema import VideoRead
+from app.services.media_errors import InvalidMediaFile, MediaNotFound
+from app.services.video_service import VideoService
 
 router = APIRouter(prefix="/videos", tags=["videos"])
-VIDS_DIR = Path("uploads") / "vids"
 
-def _build_video_view(v: Video) -> Video_View:
-    return Video_View(
-        id=v.id,
-        title=v.title,
-        description=v.description,
-        video_url=f"/videos/stream/{v.id}",
-        tags=[{"id": t.id, "name": t.name} for t in (v.tags or [])]
-    )
+ROLES = [RoleEnum.admin, RoleEnum.teacher, RoleEnum.student]
+WRITE_ROLES = [RoleEnum.admin, RoleEnum.teacher]
 
-@router.get("/", response_model=list[Video_View])
-def get_videos(db: Session = Depends(get_db)):
-    videos = db.query(Video).options(joinedload(Video.tags)).filter(Video.deleted_at == None).all()
-    return [_build_video_view(v) for v in videos]
 
-@router.post("/upload", response_model=Video_View)
-async def upload_file(
+def get_video_service(db: Session = Depends(get_db)) -> VideoService:
+    return VideoService(db)
+
+
+@router.get("/", response_model=list[VideoRead])
+def list_videos(
+    svc: VideoService = Depends(get_video_service),
+    user: Account = Depends(RoleChecker(ROLES)),
+) -> list[VideoRead]:
+    return svc.list_videos()
+
+
+@router.post("/upload", response_model=VideoRead)
+async def upload_video(
     file: UploadFile = File(...),
     title: str = Form(...),
-    description: Optional[str] = Form(None),
+    description: str | None = Form(None),
     tags: str = Form(""),
-    db: Session = Depends(get_db)
-):
-    VIDS_DIR.mkdir(parents=True, exist_ok=True)
-    file_location = VIDS_DIR / f"{uuid.uuid4()}_{file.filename}"
-    with open(file_location, "wb") as f:
-        shutil.copyfileobj(file.file, f)
+    svc: VideoService = Depends(get_video_service),
+    user: Account = Depends(RoleChecker(WRITE_ROLES)),
+) -> VideoRead:
+    data = await file.read()
+    tag_names = [t.strip() for t in tags.split(",") if t.strip()]
+    try:
+        return svc.upload(
+            data,
+            file.filename or "",
+            title=title,
+            description=description,
+            tag_names=tag_names,
+        )
+    except InvalidMediaFile as exc:
+        raise HTTPException(status_code=400, detail=exc.detail) from exc
+    except IntegrityError as exc:
+        raise HTTPException(status_code=400, detail="Invalid video data") from exc
 
-    repo = Video_Repo(db)
-    video_db = repo.create_video(Video_Create(
-        title=title, description=description, file_path=str(file_location)
-    ))
 
-    tag_names = [t.strip() for t in tags.split(",") if t.strip()] if tags.strip() else []
-    for tag_name in tag_names:
-        tag = db.query(Tag).filter(Tag.name.ilike(tag_name)).first()
-        if not tag:
-            tag = Tag(name=tag_name.strip().lower())
-            db.add(tag)
-            db.flush()
-        if tag not in video_db.tags:
-            video_db.tags.append(tag)
-    db.commit()
-    db.refresh(video_db)
-    return _build_video_view(video_db)
-
-@router.post("/upload_multiple", response_model=list[Video_View])
-async def upload_multiple(
+@router.post("/upload_multiple", response_model=list[VideoRead])
+async def upload_multiple_videos(
     files: list[UploadFile] = File(...),
-    db: Session = Depends(get_db)
-):
-    VIDS_DIR.mkdir(parents=True, exist_ok=True)
-    repo = Video_Repo(db)
-    results = []
-    for file in files:
-        file_location = VIDS_DIR / f"{uuid.uuid4()}_{file.filename}"
-        with open(file_location, "wb") as f:
-            shutil.copyfileobj(file.file, f)
-        video_db = repo.create_video(Video_Create(
-            title=file.filename.rsplit(".", 1)[0],
-            description=None,
-            file_path=str(file_location)
-        ))
-        db.refresh(video_db)
-        results.append(_build_video_view(video_db))
-    return results
+    svc: VideoService = Depends(get_video_service),
+    user: Account = Depends(RoleChecker(WRITE_ROLES)),
+) -> list[VideoRead]:
+    payloads = [(await file.read(), file.filename or "") for file in files]
+    try:
+        return svc.upload_multiple(payloads)
+    except InvalidMediaFile as exc:
+        raise HTTPException(status_code=400, detail=exc.detail) from exc
+    except IntegrityError as exc:
+        raise HTTPException(status_code=400, detail="Invalid video data") from exc
 
-@router.patch("/{video_id}", response_model=Video_View)
+
+@router.patch("/{video_id}", response_model=VideoRead)
 def update_video(
     video_id: int,
-    title: Optional[str] = None,
-    description: Optional[str] = None,
-    tags: Optional[str] = None,
-    db: Session = Depends(get_db)
-):
-    video = db.query(Video).options(joinedload(Video.tags)).filter(Video.id == video_id).first()
-    if not video:
-        raise HTTPException(status_code=404, detail="Video not found")
-    if title is not None:
-        video.title = title
-    if description is not None:
-        video.description = description
-    if tags is not None:
-        tag_names = [t.strip() for t in tags.split(",") if t.strip()]
-        video.tags.clear()
-        for tag_name in tag_names:
-            tag = db.query(Tag).filter(Tag.name.ilike(tag_name)).first()
-            if not tag:
-                tag = Tag(name=tag_name.strip().lower())
-                db.add(tag)
-                db.flush()
-            video.tags.append(tag)
-    db.commit()
-    db.refresh(video)
-    return _build_video_view(video)
+    title: str | None = None,
+    description: str | None = None,
+    tags: str | None = None,
+    svc: VideoService = Depends(get_video_service),
+    user: Account = Depends(RoleChecker(WRITE_ROLES)),
+) -> VideoRead:
+    tag_names = (
+        [t.strip() for t in tags.split(",") if t.strip()] if tags is not None else None
+    )
+    try:
+        return svc.update(
+            video_id, title=title, description=description, tag_names=tag_names
+        )
+    except MediaNotFound as exc:
+        raise HTTPException(status_code=404, detail=exc.detail) from exc
 
-@router.delete("/{video_id}")
-def delete_video(video_id: int, db: Session = Depends(get_db)):
-    repo = Video_Repo(db)
-    return repo.delete_video(video_id)
+
+@router.delete("/{video_id}", status_code=204)
+def delete_video(
+    video_id: int,
+    svc: VideoService = Depends(get_video_service),
+    user: Account = Depends(RoleChecker(WRITE_ROLES)),
+) -> None:
+    try:
+        svc.delete(video_id)
+    except MediaNotFound as exc:
+        raise HTTPException(status_code=404, detail=exc.detail) from exc
+
 
 @router.get("/stream/{video_id}")
-def stream_video(video_id: int, db: Session = Depends(get_db)):
-    video = db.query(Video).filter(Video.id == video_id).first()
-    if not video:
-        raise HTTPException(status_code=404, detail="Video not found")
-    
-    mime_type, _ = mimetypes.guess_type(video.file_path)
-    if not mime_type:
-        mime_type = "application/octet-stream"
-
-    def iterfile():
-        with open(video.file_path, "rb") as f:
-            while True:
-                chunk = f.read(1024 * 1024)
-                if not chunk:
-                    break
-                yield chunk
-
-    return StreamingResponse(iterfile(), media_type=mime_type)
+def stream_video(
+    video_id: int,
+    svc: VideoService = Depends(get_video_service),
+    user: Account = Depends(RoleChecker(ROLES)),
+) -> Response:
+    try:
+        media_path, media_type = svc.resolve_stream(video_id)
+    except MediaNotFound as exc:
+        raise HTTPException(status_code=404, detail=exc.detail) from exc
+    return Response(
+        status_code=204,
+        headers={
+            "X-Accel-Redirect": f"/media/videos/{quote(media_path.name)}",
+            "Content-Type": media_type,
+            "Accept-Ranges": "bytes",
+        },
+    )

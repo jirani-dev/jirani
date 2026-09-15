@@ -1,20 +1,28 @@
-from pydantic import BaseModel, ConfigDict
-from typing import Optional, List
-from app.schemas.tag_schema import TagRead, TagCreate
+from pydantic import BaseModel, ConfigDict, computed_field
 
-class Video_Create(BaseModel):
+from app.schemas.tag_schema import TagRead
+
+
+class VideoCreate(BaseModel):
     title: str
-    description: Optional[str] = None
+    description: str | None = None
     file_path: str
 
-class Video_View(BaseModel):
+
+class VideoRead(BaseModel):
     id: int
     title: str
-    description: Optional[str] = None
-    video_url: str
-    tags: List[TagRead] = []
+    description: str | None = None
+    poster_path: str | None = None
+    tags: list[TagRead] = []
     model_config = ConfigDict(from_attributes=True)
 
-class Video_Delete(BaseModel):
-    title: str
-    description: Optional[str] = None
+    @computed_field
+    def video_url(self) -> str:
+        return f"/videos/stream/{self.id}"
+
+    @computed_field
+    def poster_url(self) -> str | None:
+        if not self.poster_path:
+            return None
+        return f"/static/covers/{self.poster_path}"

@@ -1,15 +1,17 @@
 [project]
 name = "jirani-offline-library"
 version = "0.1.0"
-description = "Add your description here"
+description = "Jirani Offline Library — FastAPI backend for offline library management"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "alembic>=1.17.2",
+    "bcrypt<4.1.0",
     "dotenv>=0.9.9",
     "fastapi>=0.118.0",
     "passlib>=1.7.4",
     "psycopg2-binary>=2.9.10",
+    "pydantic>=2.13.4",
     "pydantic-settings>=2.11.0",
     "pymupdf>=1.26.7",
     "python-jose[cryptography]>=3.5.0",
@@ -17,3 +19,52 @@ dependencies = [
     "sqlalchemy>=2.0.43",
     "uvicorn>=0.37.0",
 ]
+
+[dependency-groups]
+dev = [
+    "httpx",
+    "mypy",
+    "pytest",
+    "ruff",
+    "testcontainers[postgres]>=4.9.1",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["app/tests"]
+pythonpath = ["."]
+addopts = "--tb=short"
+
+
+[tool.ruff]
+line-length = 88
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "N"]
+ignore = [
+    "B008",  # FastAPI Depends() default-argument idiom
+    "N818",  # domain exceptions are <Noun><State>, not <Noun>Error — see AGENTS.md Naming
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Known debt from the AGENTS.md invariant table, machine-readable.
+# Delete a line when its module is fixed; the AGENTS.md row goes with it.
+"app/config.py" = ["N802"]                   # ALLOWED_EXTENSIONS / ALLOWED_IMAGE_EXTENSIONS are @property constants — intentional
+
+[tool.mypy]
+python_version = "3.13"
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["jose", "passlib", "passlib.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# Tests are exercised by running them; strict annotation of every fixture and
+# helper adds no safety. App code stays fully --strict.
+module = "app.tests.*"
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+disallow_untyped_calls = false
+warn_return_any = false
+disallow_any_generics = false

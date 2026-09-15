@@ -1,29 +1,48 @@
-from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import and_
+from sqlalchemy import false, func, select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session, selectinload
+
 from app.models import Book, Tag
-from app.schemas.book_schema import BookCreate
-from typing import Optional
+from app.repositories.author_repo import AuthorRepo
+from app.repositories.genre_repo import GenreRepo
+from app.repositories.level_repo import LevelRepo
+from app.repositories.tag_repo import TagRepo
+from app.schemas.book_schema import BookCreate, BookSearchCriteria
+from app.services.book_errors import BookNotFound
+
 
 class BookRepo:
     def __init__(self, db_session: Session):
         self.db_session = db_session
 
-    def get_book_by_uid(self, book_uid: str) -> Book:
-        return self.db_session.query(Book).options(joinedload(Book.tags)).filter(Book.uid == book_uid).first()
+    def get_book_by_uid(self, book_uid: str) -> Book | None:
+        stmt = (
+            select(Book)
+            .options(
+                selectinload(Book.author),
+                selectinload(Book.level),
+                selectinload(Book.genre),
+                selectinload(Book.tags),
+            )
+            .where(Book.uid == book_uid)
+        )
+        return self.db_session.execute(stmt).scalar_one_or_none()
 
     def create_book(self, book_create: BookCreate) -> Book:
         tag_data = book_create.tags
-        book_dict = book_create.model_dump(exclude={"tags", "cover_url"})
-        
-        existing = self.db_session.query(Book).filter(Book.uid == book_create.uid).first()
+        book_dict = book_create.model_dump(exclude={"tags"})
+
+        existing = self.get_book_by_uid(book_create.uid)
         if existing:
             raise ValueError(f"Book with UID {book_create.uid} already exists")
-        
+
         new_book = Book(**book_dict)
-        
+
         if tag_data:
             for tag_in in tag_data:
-                tag = self.db_session.query(Tag).filter(Tag.name.ilike(tag_in.name)).first()
+                tag = self.db_session.scalar(
+                    select(Tag).where(Tag.name.ilike(tag_in.name))
+                )
                 if not tag:
                     tag = Tag(name=tag_in.name.strip().lower())
                 new_book.tags.append(tag)
@@ -33,89 +52,105 @@ class BookRepo:
             self.db_session.commit()
             self.db_session.refresh(new_book)
             return new_book
-        except Exception as e:
+        except IntegrityError:
             self.db_session.rollback()
-            raise Exception(f"Failed to create book in database: {str(e)}")
-    
+            raise
+
     def get_all_books(self) -> list[Book]:
-        return self.db_session.query(Book).options(joinedload(Book.tags)).all()
-    
+        return list(
+            self.db_session.scalars(select(Book).options(selectinload(Book.tags))).all()
+        )
+
     def cleanup_orphan_tags(self) -> None:
-        """Delete tags that are no longer attached to any book."""
-        orphans = self.db_session.query(Tag).filter(~Tag.books.any()).all()
-        for tag in orphans:
-            self.db_session.delete(tag)
-        self.db_session.commit()
+        try:
+            TagRepo(self.db_session).delete_orphans()
+            self.db_session.commit()
+        except IntegrityError:
+            self.db_session.rollback()
+            raise
 
     def delete_book(self, book_uid: str) -> None:
         book = self.get_book_by_uid(book_uid)
         if not book:
-            raise ValueError(f"Book with UID {book_uid} does not exist")
-        self.db_session.delete(book)
-        self.db_session.commit()
-        self.cleanup_orphan_tags()
-        
+            raise BookNotFound(f"Book with UID {book_uid} does not exist")
+        try:
+            self.db_session.delete(book)
+            self.db_session.flush()
+            TagRepo(self.db_session).delete_orphans()
+            self.db_session.commit()
+        except IntegrityError:
+            self.db_session.rollback()
+            raise
+
     def update_book(self, book_uid: str, book_update: BookCreate) -> Book:
         book = self.get_book_by_uid(book_uid)
         if not book:
-            raise ValueError(f"Book with UID {book_uid} does not exist")
-        
+            raise BookNotFound(f"Book with UID {book_uid} does not exist")
+
         tag_data = book_update.tags
         book_dict = book_update.model_dump(exclude={"tags", "cover_url"})
-        
+
         for key, value in book_dict.items():
             setattr(book, key, value)
-        
+
         if tag_data is not None:
             book.tags.clear()
             for tag_in in tag_data:
-                tag = self.db_session.query(Tag).filter(Tag.name.ilike(tag_in.name)).first()
+                tag = self.db_session.scalar(
+                    select(Tag).where(Tag.name.ilike(tag_in.name))
+                )
                 if not tag:
                     tag = Tag(name=tag_in.name.strip().lower())
                 book.tags.append(tag)
-        
+
         try:
             self.db_session.commit()
             self.db_session.refresh(book)
             self.cleanup_orphan_tags()
             return book
-        except Exception as e:
+        except IntegrityError:
             self.db_session.rollback()
-            raise Exception(f"Failed to update book in database: {str(e)}")
-    
-    def search_books(
-        self,
-        title: Optional[str] = None,
-        tags: Optional[list[str]] = None,
-        file_type: Optional[str] = None,
-        extension: Optional[str] = None
-    ) -> list[Book]:
-        """
-        Dynamic search with multiple optional filters.
-        Filters are combined using AND logic.
-        """
-        query = self.db_session.query(Book).options(joinedload(Book.tags))
-        
-        # Apply filters dynamically
-        filters = []
-        
-        if title:
-            filters.append(Book.title.ilike(f"%{title}%"))
-        
-        if file_type:
-            filters.append(Book.file_type.ilike(f"%{file_type}%"))
-        
-        if extension:
-            filters.append(Book.extension.ilike(extension))
-        
-        # Apply all non-tag filters
-        if filters:
-            query = query.filter(and_(*filters))
-        
-        # Handle tag filtering separately (requires join)
-        if tags:
-            # Normalize tag names
-            normalized_tags = [tag.strip().lower() for tag in tags]
-            query = query.join(Book.tags).filter(Tag.name.in_(normalized_tags))
-        
-        return query.all()
+            raise
+
+    def search(
+        self, criteria: BookSearchCriteria, *, limit: int, offset: int
+    ) -> tuple[list[Book], int]:
+        stmt = select(Book).options(
+            selectinload(Book.tags),
+            selectinload(Book.author),
+            selectinload(Book.level),
+            selectinload(Book.genre),
+        )
+
+        if criteria.title is not None:
+            stmt = stmt.where(Book.title.ilike(f"%{criteria.title}%"))
+        if criteria.language is not None:
+            stmt = stmt.where(Book.language == criteria.language)
+        if criteria.extension is not None:
+            stmt = stmt.where(Book.extension == criteria.extension)
+        if criteria.tags:
+            names = [t.lower() for t in criteria.tags]
+            stmt = stmt.where(Book.tags.any(Tag.name.in_(names)))
+        if criteria.metadata_:
+            stmt = stmt.where(Book.metadata_.contains(criteria.metadata_))
+
+        for repo, value, column in (
+            (AuthorRepo, criteria.author, Book.author_id),
+            (LevelRepo, criteria.level, Book.level_id),
+            (GenreRepo, criteria.genre, Book.genre_id),
+        ):
+            if value is not None:
+                entity = repo(self.db_session).get_by_name(value)
+                stmt = stmt.where(column == entity.id if entity else false())
+
+        total = self.db_session.execute(
+            select(func.count()).select_from(stmt.order_by(None).subquery())
+        ).scalar_one()
+
+        stmt = (
+            stmt.order_by(Book.created_at.desc(), Book.id.desc())
+            .limit(limit)
+            .offset(offset)
+        )
+        books = list(self.db_session.execute(stmt).scalars().all())
+        return books, total

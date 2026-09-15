@@ -1,0 +1,95 @@
+# Executable mirror of AGENTS.md § Build & Test Commands (check variant), scoped to
+# changed Python files. Lint/format/type config lives in backend/pyproject.toml.
+name: ci
+
+on:
+  pull_request:
+    branches: [refactor, master]
+  push:
+    branches: [refactor, master]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.13"
+
+      - name: Sync dependencies
+        working-directory: backend
+        run: uv sync
+
+      - name: Resolve changed Python files
+        id: py
+        working-directory: backend
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            range="origin/${{ github.event.pull_request.base.ref }}...HEAD"
+          elif [ -n "${{ github.event.before }}" ] && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
+            range="${{ github.event.before }}...HEAD"
+          else
+            echo "Branch-creation push — no diff basis, skipping scoped checks"
+            range=""
+          fi
+          if [ -n "$range" ]; then
+            files=$(git diff --name-only --relative --diff-filter=d "$range" -- '*.py' | tr '\n' ' ' || true)
+          else
+            files=""
+          fi
+          echo "files=$files" >> "$GITHUB_OUTPUT"
+
+      - name: Format check (changed files)
+        if: steps.py.outputs.files != ''
+        working-directory: backend
+        run: uv run ruff format --check ${{ steps.py.outputs.files }}
+
+      - name: Lint (changed files)
+        if: steps.py.outputs.files != ''
+        working-directory: backend
+        run: uv run ruff check ${{ steps.py.outputs.files }}
+
+      - name: Type check (changed files)
+        if: steps.py.outputs.files != ''
+        working-directory: backend
+        run: |
+          out="$(uv run mypy ${{ steps.py.outputs.files }} --strict || true)"
+          echo "$out"
+          errfiles="$(echo "$out" | grep "error:" | cut -d: -f1 | sort -u || true)"
+          if [ -z "$errfiles" ]; then
+            echo "No mypy errors at all"
+            exit 0
+          fi
+          bad=""
+          for f in ${{ steps.py.outputs.files }}; do
+            if echo "$errfiles" | grep -qx "$f"; then
+              bad="$bad $f"
+            fi
+          done
+          if [ -n "$bad" ]; then
+            echo "::error::mypy errors in changed files:$bad"
+            exit 1
+          fi
+          echo "::warning::mypy debt in transitively-imported untouched files: $errfiles"
+
+      - name: Tests (testcontainers Postgres)
+        working-directory: backend
+        run: uv run pytest
+
+  docker-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build backend image
+        run: docker build -f backend/Dockerfile .
