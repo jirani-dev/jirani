@@ -93,8 +93,16 @@ problem → choice → consequence, ending with the artifact that owns it.
     `migrations/**`, compose are `deny`. Owner: `.opencode/opencode.jsonc`
     `permission` block; `AGENTS.md` "Operating Mode".
 18. **Design docs are artifacts, never gates** — the superpowers skills
-    (brainstorming, writing-plans) produce specs and plans under
-    `docs/superpowers/`; decision 7 says the reviewer is the only gate.
+    (brainstorming, writing-plans) produce specs and plans locally;
+    decision 7 says the reviewer is the only gate.
     Both are true: a spec records a design, it never becomes a required
     step for anyone. The plugin is pinned so a skill update cannot change
     process by surprise. Owner: `AGENTS.md` "Superpowers" and "Docs".
+20. **Skill output is untracked; `docs/devs/specs/` is curated** — the
+    repo will be open source: contributors should not need the
+    superpowers plugin to read a spec, and process artifacts (executed
+    plans, per-task checklists) are noise for them. So plugin output
+    stays local (`docs/superpowers/`, gitignored), and what is tracked
+    under `docs/devs/specs/` is hand-written specs for ongoing features
+    only. Executed plans remain recoverable from git history. Owner:
+    `.gitignore`, `AGENTS.md` "Docs" and "Superpowers".

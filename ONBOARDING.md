@@ -2,7 +2,7 @@
 
 This repo is developed with **opencode** as a core team member. This guide
 teaches you the setup and the rules of working alongside it. For backend
-concepts themselves, read `docs/team/onboarding.md` next. `AGENTS.md` is the
+concepts themselves, read `docs/devs/onboarding.md` next. `AGENTS.md` is the
 binding ruleset — this file is the guided tour, it never overrides it.
 
 ## 1. One-time setup (this section owns setup — nothing else repeats it)
