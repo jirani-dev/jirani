@@ -1,3 +1,4 @@
+// src/pages/Library.tsx
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
@@ -14,7 +15,7 @@ import { useBookSearch } from "../hooks/useBookSearch";
 import { TagDropdown } from "../components/shared/TagDropdown";
 import { EmptyState } from "../components/shared/EmptyState";
 import { UploadModal, UploadKind } from "../components/shared/UploadModal";
-import { AddAdminModal } from "../components/auth/AddAdminModal";
+import { AddTeacherModal } from "../components/auth/AddTeacherModal";
 import { BookEditModal } from "../components/books/BookEditModal";
 import { BookGridCard } from "../components/books/BookGridCard";
 import { VideoGridCard } from "../components/video/VideoGridCard";
@@ -42,7 +43,7 @@ const Library = () => {
     const [editingBook, setEditingBook] = useState<Book | null>(null);
     const [currentlyPlayingAudio, setCurrentlyPlayingAudio] = useState<Audio["id"] | null>(null);
     const [playingVideo, setPlayingVideo] = useState<Video | null>(null);
-    const [showAddAdmin, setShowAddAdmin] = useState(false);
+    const [showAddTeacher, setShowAddTeacher] = useState(false);
 
     // Books support real server-side search/tag filtering.
     const { books, refresh: refreshBooks, setBooks } = useBookSearch(selectedBookTags, search);
@@ -53,8 +54,8 @@ const Library = () => {
     // Unique book tags come from the unfiltered set, so they don't shrink as filters narrow the list.
     const [bookTagsList, setBookTagsList] = useState<TagType[]>([]);
     const refreshBookTags = async () => {
-    const page = await booksApi.searchBooks();
-    setBookTagsList(uniqueTags(page.items));
+        const page = await booksApi.searchBooks();
+        setBookTagsList(uniqueTags(page.items));
     };
 
     const [loading, setLoading] = useState(true);
@@ -129,10 +130,10 @@ const Library = () => {
 
                 <div className={`mt-auto ${isMobile ? "py-2.5 px-1.5" : "py-3 px-2.5"} border-t border-[#E8E4DE] flex flex-col gap-1.5`}>
                     {isAdmin && (
-                        <button onClick={() => setShowAddAdmin(true)}
+                        <button onClick={() => setShowAddTeacher(true)}
                             className={`w-full flex items-center ${isMobile ? "justify-center py-2" : "justify-start py-2 px-3"} gap-2 rounded-[10px] border border-dashed border-[#D4A93A] bg-transparent hover:bg-[#F5EDD8] text-[#B8922A] cursor-pointer text-xs font-semibold transition-colors`}>
                             <UserPlus size={isMobile ? 18 : 13} />
-                            {!isMobile && "Add Admin"}
+                            {!isMobile && "Add Teacher"}
                         </button>
                     )}
                     <div className={`${isMobile ? "py-2 justify-center" : "py-2 px-3 justify-between"} rounded-[10px] bg-[#FAFAF9] flex items-center gap-2`}>
@@ -265,7 +266,7 @@ const Library = () => {
                     }} />
             )}
 
-            {showAddAdmin && isAdmin && <AddAdminModal onClose={() => setShowAddAdmin(false)} />}
+            {showAddTeacher && isAdmin && <AddTeacherModal onClose={() => setShowAddTeacher(false)} />}
 
             {playingVideo && <VideoPlayerModal video={playingVideo} onClose={() => setPlayingVideo(null)} />}
         </div>

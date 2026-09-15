@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Check, Loader2, X } from 'lucide-react';
 import { Book } from '../../types';
-import * as booksApi from '../../api/books';
+import * as booksApi from '../../services/api/books';
 
 const inputStyle =
     "w-full px-3.5 py-2.5 border border-[#E8E4DE] rounded-[10px] text-[13px] text-[#1C1A17] bg-white outline-none box-border font-sans appearance-none [-webkit-text-fill-color:#1C1A17]";

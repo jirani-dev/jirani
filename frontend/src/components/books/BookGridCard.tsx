@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { BookOpen, Loader2, Pencil, Trash2 } from 'lucide-react';
 import { Book } from '../../types';
 import API_BASE from '../../config';
-import * as booksApi from '../../api/books';
+import * as booksApi from '../../services/api/books';
 
 interface BookGridCardProps {
     book: Book;
