@@ -14,6 +14,7 @@ depends_on = None
 
 
 def upgrade() -> None:
+    op.execute(sa.text("DELETE FROM audio WHERE deleted_at IS NOT NULL"))
     op.drop_column("audio", "deleted_at")
 
 
