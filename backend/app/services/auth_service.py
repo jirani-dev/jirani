@@ -138,7 +138,7 @@ class AuthService:
     ) -> tuple[Account, str]:
         user = self.auth_repo.get_by_id(account_id)
         if not user:
-            raise ValueError(f"User with ID '{account_id}' not found.")
+            raise UserNotFound(f"User with ID '{account_id}' not found.")
         if user.role != RoleEnum.student and user.role != RoleEnum.teacher:
             raise PermissionError("You cannot reset password for admin account.")
         if user.role == RoleEnum.student:
