@@ -7,7 +7,7 @@ from app.repositories.author_repo import AuthorRepo
 from app.repositories.genre_repo import GenreRepo
 from app.repositories.level_repo import LevelRepo
 from app.repositories.tag_repo import TagRepo
-from app.schemas.book_schema import BookCreate, BookRead, BookSearchCriteria, Page
+from app.schemas.book_schema import BookCreate, BookSearchCriteria
 from app.services.book_errors import BookNotFound
 
 
@@ -114,7 +114,7 @@ class BookRepo:
 
     def search(
         self, criteria: BookSearchCriteria, *, limit: int, offset: int
-    ) -> Page[BookRead]:
+    ) -> tuple[list[Book], int]:
         stmt = select(Book).options(
             selectinload(Book.tags),
             selectinload(Book.author),
@@ -153,5 +153,4 @@ class BookRepo:
             .offset(offset)
         )
         books = list(self.db_session.execute(stmt).scalars().all())
-        items: list[BookRead] = [BookRead.model_validate(book) for book in books]
-        return Page[BookRead](items=items, total=total, limit=limit, offset=offset)
+        return books, total
