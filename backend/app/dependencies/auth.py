@@ -1,5 +1,5 @@
 # app/dependencies/auth.py
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPBearer
 from fastapi.security.http import HTTPAuthorizationCredentials
 from jose import JWTError, jwt
@@ -10,20 +10,32 @@ from app.database import get_db
 from app.models import Account, RoleEnum
 from app.repositories import AuthRepo
 
-security = HTTPBearer()
+# auto_error=False: the SPA always sends a Bearer header, but native
+# <audio>/<video> src requests can't set custom headers at all — they
+# only carry cookies. Falling back to the access_token cookie below is
+# what lets the audio/video players authenticate; without it, every
+# stream request 401s silently (no header, no fallback) and playback
+# just never starts.
+security = HTTPBearer(auto_error=False)
 
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
     db: Session = Depends(get_db),
 ) -> Account:
-    token = credentials.credentials
+    token = (
+        credentials.credentials if credentials else request.cookies.get("access_token")
+    )
 
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="couldn't validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
+
+    if not token:
+        raise credentials_exception
 
     try:
         payload = jwt.decode(
