@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Trash2, Loader2, Pencil, Check, X, Music } from 'lucide-react';
 import { Audio } from '../../types';
-import { getAudioStreamUrl } from '../../api/audio';
+import { useAudioStream } from '../../hooks/useAudioStream';
 
 interface AudioCardProps {
     audio: Audio;
@@ -25,6 +25,7 @@ export const AudioCard = ({
     onStartEdit, onSaveEdit, onCancelEdit, onDelete,
 }: AudioCardProps) => {
     const audioRef = useRef<HTMLAudioElement>(null);
+    const streamUrl = useAudioStream(audio.id);
 
     // Pause this track whenever a different one starts playing
     useEffect(() => {
@@ -46,7 +47,7 @@ export const AudioCard = ({
                     onPlay={() => onPlay(audio.id)}
                     className="w-full h-9"
                 >
-                    <source src={getAudioStreamUrl(audio.id)} />
+                    <source src={streamUrl ?? undefined} />
                 </audio>
             </div>
 

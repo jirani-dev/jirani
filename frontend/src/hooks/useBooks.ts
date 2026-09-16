@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Book } from '../types';
-import * as booksApi from '../api/books';
+import * as booksApi from '../services/api/books';
 
 export function useBooks() {
     const [books, setBooks] = useState<Book[]>([]);
 
     const refresh = useCallback(async () => {
-        setBooks(await booksApi.fetchBooks());
+        const page = await booksApi.searchBooks();
+        setBooks(page.items);
     }, []);
 
     useEffect(() => { refresh(); }, [refresh]);

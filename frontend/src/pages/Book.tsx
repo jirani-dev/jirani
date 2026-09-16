@@ -5,7 +5,7 @@ import { PdfToolbar } from '../components/books/PdfToolbar';
 import { PdfCanvas } from '../components/books/PdfCanvas';
 import { PdfPageControls } from '../components/books/PdfPageControls';
 
-const ReadBook = () => {
+const Book = () => {
     const { uid } = useParams<{ uid: string }>();
     const navigate = useNavigate();
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -44,4 +44,4 @@ const ReadBook = () => {
     );
 };
 
-export default ReadBook;
+export default Book;

@@ -2,7 +2,6 @@ import { useState, MouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BookOpen, Loader2, Pencil, Trash2 } from 'lucide-react';
 import { Book } from '../../types';
-import API_BASE from '../../config';
 import * as booksApi from '../../services/api/books';
 
 interface BookGridCardProps {
@@ -31,7 +30,7 @@ export const BookGridCard = ({ book, isAdmin, onDelete, onEdit }: BookGridCardPr
         <div className="group bg-white rounded-2xl overflow-hidden border border-[#E8E4DE] shadow-[0_1px_4px_rgba(28,26,23,0.05)] hover:shadow-[0_10px_36px_rgba(28,26,23,0.11)] hover:-translate-y-[3px] transition-all flex flex-col">
             <div className="relative aspect-[2/3] bg-[#F7F5F2] overflow-hidden">
                 {book.cover_url
-                    ? <img src={`${API_BASE}${book.cover_url}`} alt={book.title} className="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-300" />
+                    ? <img src={book.cover_url ?? undefined} alt={book.title} className="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-300" />
                     : <div className="w-full h-full flex flex-col items-center justify-center gap-2 p-4">
                         <div className="w-11 h-11 rounded-xl bg-[#F5EDD8] flex items-center justify-center">
                             <BookOpen size={20} color="#B8922A" />
