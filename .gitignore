@@ -39,6 +39,10 @@ node_modules/
 # Generated briefings
 todos/
 
+# Superpowers plugin output — local process artifacts, untracked. Hand-written
+# specs for ongoing features live in docs/devs/specs/ instead.
+docs/superpowers/
+
 # Generated knowledge graph (regenerate with `graphify update .`)
 graphify-out/
 

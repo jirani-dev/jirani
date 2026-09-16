@@ -43,4 +43,4 @@ Base branch: `refactor` until the media plan's Part G lands and merges to `maste
 
 The AI gate runs first. For human review: pull the branch and run the failing or affected tests before approving. Point to files and lines. "AI found X, I disagree because Y" is a normal and expected comment — do not approve silent-but-suspicious diffs.
 
-New to this codebase? Start with `ONBOARDING.md` (the AI-assisted workflow), then `docs/team/onboarding.md` (the backend itself). First task? Ask a mentor — writing one characterization pin is the standard beginner task.
+New to this codebase? Start with `ONBOARDING.md` (the AI-assisted workflow), then `docs/devs/onboarding.md` (the backend itself). First task? Ask a mentor — writing one characterization pin is the standard beginner task.

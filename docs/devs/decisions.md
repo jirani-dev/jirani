@@ -93,8 +93,27 @@ problem → choice → consequence, ending with the artifact that owns it.
     `migrations/**`, compose are `deny`. Owner: `.opencode/opencode.jsonc`
     `permission` block; `AGENTS.md` "Operating Mode".
 18. **Design docs are artifacts, never gates** — the superpowers skills
-    (brainstorming, writing-plans) produce specs and plans under
-    `docs/superpowers/`; decision 7 says the reviewer is the only gate.
+    (brainstorming, writing-plans) produce specs and plans locally;
+    decision 7 says the reviewer is the only gate.
     Both are true: a spec records a design, it never becomes a required
     step for anyone. The plugin is pinned so a skill update cannot change
     process by surprise. Owner: `AGENTS.md` "Superpowers" and "Docs".
+19. **Docs-only PRs skip the test suite in CI** — a 2.5-minute
+    testcontainers run proves nothing about markdown and taxes exactly
+    the iterations (wording rounds) that are most frequent. The
+    `quality` job always runs so the required check still reports; only
+    the pytest step is conditional on a "docs-only" diff (markdown and
+    `docs/**`). The filter is fail-closed: one non-docs file anywhere in
+    the diff runs the full suite, and mypy already skipped docs PRs via
+    the changed-Python-files gate. Consequence: a docs PR merged onto a
+    changed base is not itself test-verified — the next code PR catches
+    that. Owner: `.github/workflows/ci.yml`, `AGENTS.md` § Build & Test
+    Commands.
+20. **Skill output is untracked; `docs/devs/specs/` is curated** — the
+    repo will be open source: contributors should not need the
+    superpowers plugin to read a spec, and process artifacts (executed
+    plans, per-task checklists) are noise for them. So plugin output
+    stays local (`docs/superpowers/`, gitignored), and what is tracked
+    under `docs/devs/specs/` is hand-written specs for ongoing features
+    only. Executed plans remain recoverable from git history. Owner:
+    `.gitignore`, `AGENTS.md` "Docs" and "Superpowers".
