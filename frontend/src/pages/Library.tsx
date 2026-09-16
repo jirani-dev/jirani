@@ -11,9 +11,9 @@ import { useVideos } from "../hooks/useVideos";
 import { useAudio } from "../hooks/useAudio";
 import { useBookSearch } from "../hooks/useBookSearch";
 
-import { TagDropdown } from "../components/shared/TagDropdown";
-import { EmptyState } from "../components/shared/EmptyState";
-import { UploadModal, UploadKind } from "../components/shared/UploadModal";
+import { TagDropdown } from "../components/common/TagDropdown";
+import { EmptyState } from "../components/common/EmptyState";
+import { UploadModal, UploadKind } from "../components/common/UploadModal";
 import { AddAdminModal } from "../components/auth/AddAdminModal";
 import { BookEditModal } from "../components/books/BookEditModal";
 import { BookGridCard } from "../components/books/BookGridCard";
