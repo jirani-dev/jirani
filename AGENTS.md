@@ -182,12 +182,15 @@ Invariant 6 is the enforceable core; this table is the full convention. Where th
 | Modules | `snake_case`; `<entity>_router.py`, `<entity>_schema.py`, `<entity>_repo.py`, `<entity>_service.py`, `<area>_errors.py` | consistent |
 | Tests | `tests/<area>/test_<module>_<aspect>.py` (`test_book_stream.py`, `test_video_api.py`) | consistent |
 | Settings | `UPPER_CASE` fields and properties on `Settings` (`N802` per-file-ignore on `config.py`) | consistent |
+| **Component folder (frontend)** | **Default home**: domain folder first (`components/<domain>/...`). `components/common/` only when 2+ domains use the same component. | consistent |
+| **`common/` is promotion-only** | a component enters `components/common/` only after a second feature adopts it | consistent |
+| **Pinned-token exemption** | data tables, headers, and other large composites belong in `components/common/` once they earn the bar; do NOT introduce a new upper tier (atoms/molecules/organisms/etc.) without explicit human approval. | consistent |
 | **React components** | `PascalCase` filename matching the default export; `.tsx` for new code; React functional components | consistent |
 | **Hooks** | `use<Thing>` camelCase filename; `.ts`; default-exports the hook function | consistent |
 | **Pages** | `PascalCase`; default-export the route component; `.tsx` | consistent |
 | **Frontend services** | `<resource>.ts` under `services/api/`; default-export `api<Resource>` (a thin fetch wrapper) | consistent |
 | **Frontend contexts** | `PascalCase`; one Provider + Context per file under `context/`; `.tsx` | consistent |
-| **Legacy `.jsx`/`.js`** | grandfathered in `components/organisms/`, `utils/`, and `main.jsx`; convert to `.tsx`/`.ts` on next touch | `organisms/DataTable.jsx`, `utils/formatters.js`, `main.jsx` |
+| **Legacy `.jsx`/`.js`** | grandfathered in `utils/` and `main.jsx`; convert to `.tsx`/`.ts` on next touch | `utils/formatters.js`, `main.jsx` |
 | **Frontend tests** *(when vitest lands)* | `*.test.ts(x)` colocated with units; e2e under `e2e/` | not yet installed (decision 2026-09-15) |
 
 The frontend pins to the frozen backend contract in `docs/devs/specs/react-kickoff-annex.md`: response shapes may gain fields, never lose or rename them; API calls go through same-origin nginx (`/api/*`); media via `/static/covers/` (public) and blob-URL fetches for protected streams; error envelope `{detail: str}`; auth is Bearer JWT with role claim. The frontend is NOT a land for backend renaming — the contract freezes on the backend side.
@@ -198,7 +201,7 @@ Six rules. Breaking one requires explicit approval, and you must say which one y
 
 | # | Invariant | "Violating today" / Notes |
 |---|---|---|
-| F1 | **TypeScript strict, no `any`** in new code. `tsconfig.app.json` is strict; `npx tsc --noEmit` is the gate. Legacy `.jsx`/`.js` files in `components/organisms/`, `utils/`, and `main.jsx` are grandfathered — convert on next touch (see Naming table). | — (legacy JSX grandfathered; tracked in Naming table) |
+| F1 | **TypeScript strict, no `any`** in new code. `tsconfig.app.json` is strict; `npx tsc --noEmit` is the gate. Legacy `.jsx`/`.js` files in `utils/` and `main.jsx` are grandfathered — convert on next touch (see Naming table). | — (legacy JSX grandfathered; tracked in Naming table) |
 | F2 | **Same-origin API.** UI calls the backend through `import.meta.env.VITE_API_BASE` (`/api/*`) only — `services/api/*` is the only place that knows the base URL. Never embed backend host or port in a page or component. | — |
 | F3 | **Frozen backend contract.** Response shapes from `docs/devs/specs/react-kickoff-annex.md` (`BookRead` incl. `cover_url`, `VideoRead`, `TagRead`, `AuthorRead`/`LevelRead`/`GenreRead`, `Page[T]`). Error body shape `{detail: str}`. Auth: Bearer JWT with role claim. URL prefixes: `/api/`, `/media/` (internal-only), `/static/covers/` (public). May gain fields, never lose or rename them. | — |
 | F4 | **Media access rule.** `<img src="/static/covers/...">` works natively (public). For protected streams (`/api/books/{uid}/stream`, `/api/videos/stream/{id}`) — fetch with the auth wrapper into a blob URL (`URL.createObjectURL`), buffering the whole file client-side. Native `<video>`/`<embed>` tags cannot carry the `Authorization` header; do not use them for protected streams. A short-lived signed ticket (`?ticket=`) is a deliberate later backend feature, not silently invented. | — (ticket-style shorts deferred; blob-URL fetch is the standing pattern until the backend feature lands) |
