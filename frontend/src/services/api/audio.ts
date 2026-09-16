@@ -8,6 +8,12 @@ export function getAudioStreamUrl(id: Audio['id']): string {
     return `${BASE}/stream/${id}`;
 }
 
+export async function streamAudio(id: Audio['id']): Promise<Blob> {
+    const res = await apiFetch(`${BASE}/stream/${id}`);
+    if (!res.ok) throw new Error('Failed to stream audio');
+    return res.blob();
+}
+
 export async function fetchAudioTracks(): Promise<Audio[]> {
     const res = await apiFetch(`${BASE}/`);
     if (!res.ok) throw new Error('Failed to fetch audio');

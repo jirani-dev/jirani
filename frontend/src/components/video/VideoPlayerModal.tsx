@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { X } from 'lucide-react';
 import { Video } from '../../types';
-import { getVideoStreamUrl } from '../../services/api/videos';
+import { useVideoStream } from '../../hooks/useVideoStream';
 
 interface VideoPlayerModalProps {
     video: Video;
@@ -15,6 +15,8 @@ export const VideoPlayerModal = ({ video, onClose }: VideoPlayerModalProps) => {
         return () => window.removeEventListener('keydown', handleKey);
     }, [onClose]);
 
+    const streamUrl = useVideoStream(video.id);
+
     return (
         <div onClick={onClose} className="fixed inset-0 z-50 bg-black/[0.92] flex flex-col items-center justify-center p-5">
             <div onClick={e => e.stopPropagation()} className="w-full max-w-[960px] flex flex-col gap-3.5">
@@ -25,7 +27,7 @@ export const VideoPlayerModal = ({ video, onClose }: VideoPlayerModalProps) => {
                     </button>
                 </div>
                 <video autoPlay controls className="w-full rounded-xl bg-black max-h-[75vh]">
-                    <source src={getVideoStreamUrl(video.id)} />
+                    <source src={streamUrl ?? undefined} />
                 </video>
                 {video.description && <p className="text-[13px] text-[#A09890] m-0">{video.description}</p>}
                 {video.tags && video.tags.length > 0 && (

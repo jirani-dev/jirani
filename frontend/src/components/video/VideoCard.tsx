@@ -1,6 +1,6 @@
 import { Trash2, Loader2, Pencil, Check, X } from 'lucide-react';
 import { Video } from '../../types';
-import { getVideoStreamUrl } from '../../api/videos';
+import { useVideoStream } from '../../hooks/useVideoStream';
 
 interface VideoCardProps {
     video: Video;
@@ -21,10 +21,12 @@ export const VideoCard = ({
     editTitle, editDescription,
     onEditTitleChange, onEditDescriptionChange,
     onStartEdit, onSaveEdit, onCancelEdit, onDelete,
-}: VideoCardProps) => (
+}: VideoCardProps) => {
+    const streamUrl = useVideoStream(video.id);
+    return (
     <div className="bg-[#111111] border border-[#2a2a2a] rounded overflow-hidden hover:border-[#7a5e20] hover:-translate-y-0.5 transition-all duration-200">
         <video controls preload="metadata" className="w-full block bg-black max-h-44 object-cover">
-            <source src={getVideoStreamUrl(video.id)} type="video/mp4" />
+            <source src={streamUrl ?? undefined} type="video/mp4" />
         </video>
 
         {isEditing ? (
@@ -85,4 +87,5 @@ export const VideoCard = ({
             </div>
         )}
     </div>
-);
+    );
+};

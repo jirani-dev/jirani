@@ -1,8 +1,8 @@
 import { useState, MouseEvent } from 'react';
 import { Trash2, Loader2, Pencil, Check, X } from 'lucide-react';
 import { Video } from '../../types';
-import { getVideoStreamUrl } from '../../services/api/videos';
 import * as videosApi from '../../services/api/videos';
+import { useVideoStream } from '../../hooks/useVideoStream';
 
 const inputStyle =
     "w-full px-3.5 py-2.5 border border-[#E8E4DE] rounded-[10px] text-[13px] text-[#1C1A17] bg-white outline-none box-border font-sans appearance-none [-webkit-text-fill-color:#1C1A17]";
@@ -21,6 +21,7 @@ export const VideoGridCard = ({ video, isAdmin, onDelete, onUpdate, onPlay }: Vi
     const [editTitle, setEditTitle] = useState(video.title);
     const [editDesc, setEditDesc] = useState(video.description || '');
     const [editTags, setEditTags] = useState(video.tags?.map(t => t.name).join(', ') || '');
+    const streamUrl = useVideoStream(video.id);
 
     const handleDelete = async (e: MouseEvent) => {
         e.stopPropagation();
@@ -49,7 +50,7 @@ export const VideoGridCard = ({ video, isAdmin, onDelete, onUpdate, onPlay }: Vi
         <div className="group bg-white rounded-2xl overflow-hidden border border-[#E8E4DE] shadow-[0_1px_4px_rgba(28,26,23,0.05)] hover:shadow-[0_8px_28px_rgba(28,26,23,0.10)] transition-all">
             <div onClick={() => !editing && onPlay(video)} className="relative aspect-video bg-black cursor-pointer overflow-hidden">
                 <video preload="metadata" muted className="w-full h-full object-cover block group-hover:scale-[1.03] transition-transform duration-300">
-                    <source src={`${getVideoStreamUrl(video.id)}#t=1`} />
+                    <source src={streamUrl ? `${streamUrl}#t=1` : undefined} />
                 </video>
                 <div className="absolute inset-0 flex items-center justify-center bg-black/15 group-hover:bg-black/30 transition-colors">
                     <div className="w-11 h-11 rounded-full bg-white/75 group-hover:bg-white/95 flex items-center justify-center transition-all group-hover:scale-110">
