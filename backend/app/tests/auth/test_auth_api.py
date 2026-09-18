@@ -255,6 +255,54 @@ def test_login_wrong_password_is_401(client: TestClient, setup_paths: Path) -> N
     assert response.status_code == 401
 
 
+def test_cookie_only_auth_succeeds_on_me(client: TestClient, setup_paths: Path) -> None:
+    # /auth/me is the simplest endpoint to prove the fallback with: the
+    # access_token cookie login() leaves on the client must be enough on
+    # its own, with no Authorization header at all — this is the exact
+    # codepath native <audio>/<video> tags rely on, since they can't send
+    # a custom header.
+    admin_pwd = setup_admin(client, setup_paths)
+    login(client, "admin", admin_pwd)
+    response = client.get("/auth/me")
+    assert response.status_code == 200
+    assert response.json()["username"] == "admin"
+
+
+def test_invalid_bearer_header_not_masked_by_valid_cookie(
+    client: TestClient, setup_paths: Path
+) -> None:
+    # The cookie is only a fallback for when no Authorization header is
+    # sent at all — a present-but-invalid header must still fail, not
+    # silently succeed via the cookie. Locks in that precedence.
+    admin_pwd = setup_admin(client, setup_paths)
+    login(client, "admin", admin_pwd)  # leaves a valid access_token cookie
+    response = client.get("/auth/me", headers={"Authorization": "Bearer garbage"})
+    assert response.status_code == 401
+
+
+def test_logout_clears_cookie(client: TestClient, setup_paths: Path) -> None:
+    admin_pwd = setup_admin(client, setup_paths)
+    login(client, "admin", admin_pwd)
+    assert "access_token" in client.cookies
+
+    response = client.post("/auth/logout")
+    assert response.status_code == 200
+    assert "access_token" not in client.cookies
+
+    # The cleared cookie can no longer authenticate a cookie-only request.
+    me_response = client.get("/auth/me")
+    assert me_response.status_code == 401
+
+
+def test_logout_without_prior_login_still_succeeds(
+    client: TestClient, setup_paths: Path
+) -> None:
+    # Logout must be idempotent: calling it with no session at all
+    # (never logged in, or already logged out) is not an error.
+    response = client.post("/auth/logout")
+    assert response.status_code == 200
+
+
 def test_me_returns_current_user(client: TestClient, setup_paths: Path) -> None:
     admin_pwd = setup_admin(client, setup_paths)
     token = login(client, "admin", admin_pwd)["access_token"]

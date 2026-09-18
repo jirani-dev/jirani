@@ -1,6 +1,7 @@
 // src/context/AuthContext.tsx
 import { createContext, useContext, useState, ReactNode } from "react";
 import { LoginResponse, Role } from "../types";
+import * as authApi from "../services/api/auth";
 
 export interface AuthData {
     access_token: string;
@@ -40,8 +41,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
 
     const logout = () => {
+        // Clear local state immediately — don't make the user wait on a
+        // network round-trip to feel logged out. The server-side cookie
+        // clear happens in the background; it's best-effort by design
+        // (see authApi.logout).
         localStorage.removeItem("auth");
         setAuth(null);
+        authApi.logout();
     };
 
     const isAdmin = auth?.role === "admin";

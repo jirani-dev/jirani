@@ -22,6 +22,13 @@ docker compose up -d db
 cd backend && uv sync && uv run alembic upgrade head && uv run uvicorn app.main:app --reload
 ```
 
+If you're also running the frontend dev server (`cd frontend && npm run
+dev`) against this mode, set `VITE_API_BASE=http://localhost:8000` (see
+`frontend/.env.example`) — the frontend's default assumes the nginx-fronted
+"Run with Docker" setup above. Protected media (book/audio/video streaming)
+needs nginx's X-Accel-Redirect regardless, so it won't stream in this mode
+either way; everything else works fine once the base URL is corrected.
+
 ## Schema
 
 Managed by Alembic and applied at container startup (`alembic upgrade head`
