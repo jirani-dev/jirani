@@ -12,6 +12,13 @@ export async function login(username: string, password: string): Promise<LoginRe
     return res.json();
 }
 
+// Clears the access_token cookie server-side (localStorage/context state
+// is the caller's job — see AuthContext.logout). Best-effort: logging out
+// must still work from the user's point of view even if this call fails.
+export async function logout(): Promise<void> {
+    await apiFetch('/auth/logout', { method: 'POST' }).catch(() => {});
+}
+
 export async function changePassword(oldPassword: string, newPassword: string): Promise<void> {
     const res = await apiFetch('/auth/change-password', {
         method: 'POST',

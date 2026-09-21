@@ -46,7 +46,9 @@ async def login(
         value=access_token,
         httponly=True,  # JS can't read it — mitigates XSS token theft
         secure=False,  # plain http:// on your LAN — set True only if you add TLS
-        samesite="lax",  # sent on normal navigation/same-site requests
+        samesite="strict",  # SPA + API are same-site (localhost) either way —
+        # strict costs nothing here and narrows the CSRF surface for when
+        # state-changing endpoints start accepting cookie-only auth.
         max_age=60 * 60 * 2,  # matches ACCESS_TOKEN_EXPIRE_MINUTES (120 min)
     )
 
@@ -57,6 +59,22 @@ async def login(
         role=user.role,
         first_login=user.first_login,
     )
+
+
+@router.post("/logout", status_code=status.HTTP_200_OK)
+async def logout(response: Response) -> dict[str, str]:
+    # No auth required: logout's only job is clearing the cookie, and it
+    # must still succeed against an already-expired or already-cleared
+    # one. (Hook for the activity-tracking spec's
+    # end_active_sessions(account_id) goes here once that feature lands —
+    # it isn't implemented yet, so there's nothing to call.)
+    response.delete_cookie(
+        key="access_token",
+        httponly=True,
+        secure=False,
+        samesite="strict",
+    )
+    return {"message": "Logged out"}
 
 
 @router.post("/reset-password", status_code=status.HTTP_200_OK)
