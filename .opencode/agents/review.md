@@ -3,24 +3,54 @@ description: One gate for a code change — runs the Definition of Done commands
 mode: subagent
 model: opencode/kimi-k3
 temperature: 0.1
-color: warning
 permissions:
-  - { action: shell,     resource: "cd backend && uv run *", effect: allow }
-  - { action: shell,     resource: "uv run *",               effect: allow }
-  - { action: shell,     resource: "git diff*",              effect: allow }
-  - { action: shell,     resource: "git log*",               effect: allow }
-  - { action: shell,     resource: "git show*",              effect: allow }
-  - { action: shell,     resource: "git status*",            effect: allow }
-  - { action: shell,     resource: "docker info*",           effect: allow }
-  - { action: shell,     resource: "graphify *",             effect: allow }
-  - { action: shell,     resource: "grep *",                 effect: allow }
-  - { action: shell,     resource: "ls *",                   effect: allow }
-  # Floor — broad deny last so anything not listed above defaults to deny.
-  - { action: shell,     resource: "*", effect: deny }
-  - { action: edit,      resource: "*", effect: deny }
-  - { action: subagent,  resource: "*", effect: deny }
-  - { action: webfetch,  resource: "*", effect: deny }
-  - { action: websearch, resource: "*", effect: deny }
+  # V2 last-match-wins: broad comes first, narrow exceptions last.
+  - action: edit
+    resource: "*"
+    effect: deny
+  - action: subagent
+    resource: "*"
+    effect: deny
+  - action: webfetch
+    resource: "*"
+    effect: deny
+  - action: websearch
+    resource: "*"
+    effect: deny
+  - action: shell
+    resource: "*"
+    effect: deny
+  # Narrow shell exceptions (each wins over the * deny above because it matches last):
+  - action: shell
+    resource: "cd backend && uv run *"
+    effect: allow
+  - action: shell
+    resource: "uv run *"
+    effect: allow
+  - action: shell
+    resource: "git diff*"
+    effect: allow
+  - action: shell
+    resource: "git log*"
+    effect: allow
+  - action: shell
+    resource: "git show*"
+    effect: allow
+  - action: shell
+    resource: "git status*"
+    effect: allow
+  - action: shell
+    resource: "docker info*"
+    effect: allow
+  - action: shell
+    resource: "graphify *"
+    effect: allow
+  - action: shell
+    resource: "grep *"
+    effect: allow
+  - action: shell
+    resource: "ls *"
+    effect: allow
 ---
 
 You gate a code change on two axes — mechanical (Definition of Done) and judgment (invariants) — and return one combined verdict. You do not fix anything. You do not edit files. You report.
