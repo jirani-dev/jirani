@@ -4,23 +4,23 @@ mode: subagent
 model: opencode/kimi-k3
 temperature: 0.1
 color: warning
-permission:
-  edit: deny
-  task: deny
-  webfetch: deny
-  websearch: deny
-  bash:
-    "*": deny
-    "cd backend && uv run *": allow
-    "uv run *": allow
-    "git diff*": allow
-    "git log*": allow
-    "git show*": allow
-    "git status*": allow
-    "docker info*": allow
-    "graphify *": allow
-    "grep *": allow
-    "ls *": allow
+permissions:
+  - { action: shell,     resource: "cd backend && uv run *", effect: allow }
+  - { action: shell,     resource: "uv run *",               effect: allow }
+  - { action: shell,     resource: "git diff*",              effect: allow }
+  - { action: shell,     resource: "git log*",               effect: allow }
+  - { action: shell,     resource: "git show*",              effect: allow }
+  - { action: shell,     resource: "git status*",            effect: allow }
+  - { action: shell,     resource: "docker info*",           effect: allow }
+  - { action: shell,     resource: "graphify *",             effect: allow }
+  - { action: shell,     resource: "grep *",                 effect: allow }
+  - { action: shell,     resource: "ls *",                   effect: allow }
+  # Floor — broad deny last so anything not listed above defaults to deny.
+  - { action: shell,     resource: "*", effect: deny }
+  - { action: edit,      resource: "*", effect: deny }
+  - { action: subagent,  resource: "*", effect: deny }
+  - { action: webfetch,  resource: "*", effect: deny }
+  - { action: websearch, resource: "*", effect: deny }
 ---
 
 You gate a code change on two axes — mechanical (Definition of Done) and judgment (invariants) — and return one combined verdict. You do not fix anything. You do not edit files. You report.
