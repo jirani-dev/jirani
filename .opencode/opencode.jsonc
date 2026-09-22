@@ -20,39 +20,33 @@
   },
   // Enforces the operating mode declared in AGENTS.md.
   // Prose in AGENTS.md is a request; this block is the actual boundary.
-  // NOTE: within each object the LAST matching rule wins — broad patterns
-  // first, narrow exceptions after.
-  "permission": {
-    "edit": {
-      "*": "allow",
-      // Application source — the agent edits, you confirm each edit in the TUI.
-      "backend/app/**": "ask",
-      // Dependencies, packaging, schema — human hands only. The agent proposes the diff in chat.
-      "backend/pyproject.toml": "deny",
-      "backend/uv.lock": "deny",
-      "backend/Dockerfile": "deny",
-      "backend/alembic.ini": "deny",
-      "backend/migrations/**": "deny",
-      "docker-compose.yml": "deny",
-      "docker/**": "deny"
-    },
-    "bash": {
-      "*": "allow",
-      // History-rewriting or destructive operations always confirm first.
-      "git commit*": "ask",
-      "git push*": "ask",
-      "git reset*": "ask",
-      "git checkout*": "ask",
-      "git switch*": "ask",
-      "git rebase*": "ask",
-      "git merge*": "ask",
-      "git rm*": "ask",
-      "rm *": "ask",
-      "docker compose down*": "ask",
-      "psql*": "ask",
-      // The only route to a dependency change — uv.lock is generated, pyproject is never hand-edited by the agent.
-      "uv add*": "ask",
-      "uv remove*": "ask"
-    }
-  }
+  // NOTE: V2 ordered `permissions[]`. FIRST match wins — narrow first, broad last.
+  "permissions": [
+    // Application source — first match wins in V2 ordered form.
+    // Order matters: narrowest deny first, broadest allow last.
+    { "action": "edit",    "resource": "backend/uv.lock",        "effect": "deny" },
+    { "action": "edit",    "resource": "backend/alembic.ini",    "effect": "deny" },
+    { "action": "edit",    "resource": "backend/migrations/**",  "effect": "deny" },
+    { "action": "edit",    "resource": "backend/Dockerfile",     "effect": "deny" },
+    { "action": "edit",    "resource": "docker/**",              "effect": "deny" },
+    { "action": "edit",    "resource": "docker-compose.yml",     "effect": "deny" },
+    { "action": "edit",    "resource": "backend/pyproject.toml", "effect": "deny" },
+    { "action": "edit",    "resource": "backend/app/**",         "effect": "ask",  "prompt": "Application source edit — confirm" },
+    { "action": "edit",    "resource": "*",                      "effect": "allow" },
+
+    { "action": "shell",   "resource": "uv add*",                "effect": "ask",  "prompt": "Dependency change — confirm" },
+    { "action": "shell",   "resource": "uv remove*",             "effect": "ask",  "prompt": "Dependency change — confirm" },
+    { "action": "shell",   "resource": "git commit*",            "effect": "ask" },
+    { "action": "shell",   "resource": "git push*",              "effect": "ask" },
+    { "action": "shell",   "resource": "git reset*",             "effect": "ask" },
+    { "action": "shell",   "resource": "git checkout*",          "effect": "ask" },
+    { "action": "shell",   "resource": "git switch*",            "effect": "ask" },
+    { "action": "shell",   "resource": "git rebase*",            "effect": "ask" },
+    { "action": "shell",   "resource": "git merge*",             "effect": "ask" },
+    { "action": "shell",   "resource": "git rm*",                "effect": "ask" },
+    { "action": "shell",   "resource": "rm *",                   "effect": "ask" },
+    { "action": "shell",   "resource": "docker compose down*",   "effect": "ask" },
+    { "action": "shell",   "resource": "psql*",                  "effect": "ask" },
+    { "action": "shell",   "resource": "*",                      "effect": "allow" }
+  ]
 }
