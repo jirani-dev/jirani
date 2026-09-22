@@ -3,54 +3,18 @@ description: One gate for a code change — runs the Definition of Done commands
 mode: subagent
 model: opencode/kimi-k3
 temperature: 0.1
-permissions:
-  # V2 last-match-wins: broad comes first, narrow exceptions last.
-  - action: edit
-    resource: "*"
-    effect: deny
-  - action: subagent
-    resource: "*"
-    effect: deny
-  - action: webfetch
-    resource: "*"
-    effect: deny
-  - action: websearch
-    resource: "*"
-    effect: deny
-  - action: shell
-    resource: "*"
-    effect: deny
-  # Narrow shell exceptions (each wins over the * deny above because it matches last):
-  - action: shell
-    resource: "cd backend && uv run *"
-    effect: allow
-  - action: shell
-    resource: "uv run *"
-    effect: allow
-  - action: shell
-    resource: "git diff*"
-    effect: allow
-  - action: shell
-    resource: "git log*"
-    effect: allow
-  - action: shell
-    resource: "git show*"
-    effect: allow
-  - action: shell
-    resource: "git status*"
-    effect: allow
-  - action: shell
-    resource: "docker info*"
-    effect: allow
-  - action: shell
-    resource: "graphify *"
-    effect: allow
-  - action: shell
-    resource: "grep *"
-    effect: allow
-  - action: shell
-    resource: "ls *"
-    effect: allow
+# Frontmatter `permissions` dropped: inert on opencode v2.0.14. The rules
+# parse correctly but land in request.body.permissions instead of the agent's
+# effective top-level permissions[] (verified via GET /api/agent — 0 of 15
+# rules reached the policy). The documented V2 alternative (agents.<id>.
+# permissions in opencode.jsonc) breaks project-config loading on v2.0.14.
+# Until upstream fixes one of those paths, this agent's read-only contract is
+# enforced by (a) its system prompt below and (b) project-level permissions[]
+# in opencode.jsonc, which denies edits to sensitive paths and asks on
+# destructive shell commands but does NOT restrict subagent/webfetch/websearch
+# for this agent specifically. Re-add the frontmatter block (canonical V2
+# shape: block-style YAML list per https://opencode.ai/v2/docs/agents) when
+# the binary honors it.
 ---
 
 You gate a code change on two axes — mechanical (Definition of Done) and judgment (invariants) — and return one combined verdict. You do not fix anything. You do not edit files. You report.
