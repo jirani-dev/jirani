@@ -8,7 +8,7 @@ Developer agent for **Jirani** — a FastAPI + PostgreSQL offline-library backen
 
 - Lead with the answer. No preamble, no restating the question back.
 - Cite `file_path:line` for any claim about the code. An uncited claim is a guess — label it as one.
-- Verify before asserting. "It works" requires the command output that proves it.
+- Verify before asserting. "It works" requires the command output that proves it. Never claim something passes without pasting that output.
 - Disagree when the technical facts warrant it, and say why. Agreement you do not hold is worthless.
 - Never invent config keys, agent names, CLI flags, or APIs. If unsure, read the schema or run `--help`, then report what you found.
 - Say "I don't know, here is how to find out" rather than producing plausible text. A confident wrong answer costs more than an admitted gap.
@@ -18,9 +18,7 @@ Developer agent for **Jirani** — a FastAPI + PostgreSQL offline-library backen
 1. Consult graphify first, source files last (see the graphify section below).
 2. Check the six binding invariants. Name any the change would violate.
 3. State the blast radius — what else imports or calls this (e.g. "`book_service` is imported by `book_router` and `tests/media/test_book_api.py`").
-4. If it touches DB schema or core request routing, ask before making it.
-
-**Escalation:** after three failed autonomous attempts at the same problem, stop. Print the exact failing output and ask for direction. Do not loop.
+4. If it touches DB schema, adds a migration, or refactors core request routing, ask before making it.
 
 ## Operating Mode: Developer, Human in the Loop
 
@@ -44,28 +42,19 @@ Developer agent for **Jirani** — a FastAPI + PostgreSQL offline-library backen
 - Verification: `uv run pytest`, `uv run ruff`, `uv run mypy`, `docker compose build|up|logs`
 - Anything destructive asks first: `git commit|push|reset|checkout|switch|rebase|merge|rm`, `rm`, `docker compose down`, `psql`, `uv add|remove`. Never run DDL against a database.
 
-**These boundaries are enforced, not merely requested.** `.opencode/opencode.jsonc` carries the `permission` block that implements the lists above. If a tool call is refused, that is the config working — do not route around it with a shell command. If a denied path must change, the human changes it (or relaxes the permission themselves).
+**These boundaries are enforced, not merely requested.** `.opencode/opencode.jsonc` carries the `permissions[]` rules that implement the lists above. If a tool call is refused, that is the config working — do not route around it with a shell command. If a denied path must change, the human changes it (or relaxes the permission themselves).
+
+That file is shared and committed; machine-specific overrides belong in your global `~/.config/opencode/opencode.json`, which merges with the project file. First-day setup — `uv sync`, Docker, pre-commit, graphify — is owned by `ONBOARDING.md` §1; do not repeat it here.
 
 ## graphify — MUST USE FIRST
 
-This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
+A knowledge graph lives at `graphify-out/` (god nodes, community structure, cross-file relationships). For any codebase question, in this order:
 
-**Required workflow — you MUST follow this order for any codebase question:**
+1. `graphify query "<question>"` for a scoped subgraph (when `graphify-out/graph.json` exists); `graphify path "<A>" "<B>"` for relationships; `graphify explain "<concept>"` for concepts.
+2. If those fall short: `graphify-out/GRAPH_REPORT.md` for broad architecture, or `graphify-out/wiki/index.md` for navigation when it exists.
+3. Source files only as a last resort — never before graphify has been consulted. The only skips: the task is about stale or incorrect graph output, or the user explicitly says not to use it.
 
-1. First, run `graphify query "<question>"` (when graphify-out/graph.json exists) to get a scoped subgraph. Do NOT read source files directly until graphify has been consulted.
-2. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts.
-3. Only if graphify query/path/explain return insufficient context, read graphify-out/GRAPH_REPORT.md for broad architecture review.
-4. Only as a last resort, read source files directly. Never jump to reading source files before checking graphify.
-
-Other rules:
-- graphify-out/ is gitignored (generated artifacts). On a fresh clone, run `graphify update .` once before querying; regenerate with the same command after code changes.
-- Dirty graphify-out/ files are expected after hooks or incremental updates; dirty graph files are not a reason to skip graphify. Only skip graphify if the task is about stale or incorrect graph output, or the user explicitly says not to use it.
-- If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
-- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).
-
-## Cross-Machine Setup
-
-`.opencode/opencode.jsonc` is shared and committed. Machine-specific overrides (e.g. native Windows `USERPROFILE` vs `HOME`) belong in your global `~/.config/opencode/opencode.json`, which merges with the project file. First-day setup — `uv sync`, Docker, pre-commit, graphify — is owned by `ONBOARDING.md` §1; do not repeat it here.
+`graphify-out/` is gitignored. On a fresh clone run `graphify update .` once before querying; after modifying code run it again to keep the graph current (AST-only, no API cost). Dirty graph files after hooks or incremental updates are expected — not a reason to skip graphify.
 
 ## External Knowledge & Global Search (MCPs)
 
@@ -76,42 +65,44 @@ Other rules:
 
 ## Subagents
 
-Subagents run in a **child session with their own context**. Their tool output — a 300-line pytest run, a long audit report — never enters the main conversation; only their final report does. That is the point: they preserve the primary context, not merely divide labour.
+Subagents run in a child session with their own context: their tool output — a 300-line pytest run, a long audit — never enters the main conversation, only their final report. They preserve primary context.
 
 **Built-in:** `general` (multi-step work, full tools), `explore` (fast, read-only codebase search).
 
-**Project subagents** — defined in `.opencode/agent/`:
+**Project subagents** — defined in `.opencode/agents/`:
 
 | Agent | Model | Writes? | Use it when | Returns |
 |---|---|---|---|---|
 | `review` | `kimi-k3` | no | before claiming anything is done, before committing, when reviewing a diff or a proposed snippet | DoD pass/fail per command + invariant findings with `file:line` + one combined `DONE`/`NOT DONE` verdict |
+| `executor` | `deepseek-v4-pro` | yes (global permission gates still apply) | large or batched implementation work, dispatched with an exhaustive brief — not chat-sized edits, which the primary agent does directly | files changed + dev-variant DoD output + deviations from the brief |
 
-**Why kimi-k3:** the agent does real reasoning — it must distinguish a *new* invariant violation from the pre-existing debt listed in this file's invariant table, and a weak model there either false-alarms (you learn to ignore it) or misses real ones (worse). The mechanical DoD commands ride along in the same dispatch; at local frequency the model cost is trivial. The CI `ai-review` check runs the same model (repository variable `AI_REVIEW_MODEL` = `opencode/kimi-k3`) against the same invariant table on every PR, but a narrower contract: CI audits invariants only and emits `VERDICT: PASS|VIOLATION`; the local agent audits invariants **and** runs the DoD and emits `VERDICT: DONE|NOT DONE`. Pay for judgment only where judgment lives.
+**Why kimi-k3 for review:** separating a *new* invariant violation from pre-existing debt is judgment work; a weak model either false-alarms (you learn to ignore it) or misses real ones (worse). CI's `ai-review` runs the same model (repository variable `AI_REVIEW_MODEL` = `opencode/kimi-k3`) on a narrower contract — invariants only, `VERDICT: PASS|VIOLATION` — while the local agent also runs the DoD and emits `VERDICT: DONE|NOT DONE`. Pay for judgment only where judgment lives.
 
-**Invocation:** `@review <what to gate>` to run one directly, or `/done` to dispatch the same gate.
+**Invocation:** `@review <what to gate>`, or `/done` for the same gate. `@executor <task brief>` for large implementation work — the brief must be exhaustive (scope, files, behavior, tests); the executor starts cold and stops rather than improvises.
 
-**When the primary agent should dispatch one without being asked:**
+**Dispatch without being asked when:**
 
-- About to say "this is done" or "tests pass", or reviewing a diff longer than ~50 lines → `review` first. A completion claim without its output is a guess; the dispatch also keeps long review output out of primary context.
+- About to say "this is done" or "tests pass", or reviewing a diff longer than ~50 lines → `review` first. A completion claim without its output is a guess.
+- A large, well-specified implementation task (multi-file feature, batched refactor) → `executor` with an exhaustive brief. Chat-sized edits stay in the primary session — dispatch overhead exceeds the savings otherwise.
 - Two or more genuinely independent read-only questions → dispatch in parallel, one subagent each.
 
-**Do not** dispatch a subagent for a single file read, a question already answered in this session, or anything needing conversation history — subagents start cold and know only what the dispatch prompt tells them. Write the prompt as if to a competent stranger: state the task, the files, and the exact shape of the answer you want back.
+**Do not** dispatch for a single file read, a question already answered this session, or anything needing conversation history — subagents know only what the dispatch prompt tells them. Write the prompt as if to a competent stranger: the task, the files, and the exact shape of the answer you want back.
 
 <!-- .github/workflows/ai-review.yml extracts the table below by heading text:
      sed -n '/^## System Design/,/^## Repository Structure/p'
      Keep this heading and "## Repository Structure" byte-identical. -->
 ## System Design — Binding Invariants
 
-Six rules. Breaking one requires explicit approval, and you must say which one you are breaking and why. The last column records where the current tree already violates the rule — a known debt, not a licence to add more. The debt is mirrored (plus recorded lint debt), machine-readably, in `[tool.ruff.lint.per-file-ignores]` in `backend/pyproject.toml`; when a module is fixed, delete its row here and its line there in the same commit.
+Six rules. Breaking one requires explicit approval, and you must say which one you are breaking and why. The last column records where the current tree already violates the rule — a known debt, not a licence to add more. The debt is mirrored, machine-readably, in `[tool.ruff.lint.per-file-ignores]` in `backend/pyproject.toml`; when a module is fixed, delete its row here and its line there in the same commit.
 
 | # | Invariant | Violating today |
 |---|---|---|
-| 1 | **Layering:** router → service → repository → model. Routers never open a session or query directly. Repositories never raise `HTTPException`. Business rules live in services. | — (video/tag closed by media plan Tasks 6/8, 2026-09-13/14; audio closed by audio plan Tasks 2–3, 2026-09-14) |
-| 2 | **Error mapping:** services raise domain exceptions; **only routers** translate them. `ValueError`→400, `PermissionError`→403, not-found→404, `IntegrityError`→400. The same rule returns the same status on every endpoint. | — (closed by hygiene A2, 2026-08-26) |
-| 3 | **No CWD-relative file I/O.** Every filesystem path derives from `app/config.py` settings anchored to `BASE_DIR`. Never a bare relative string. | — (closed by hygiene S3; routers read `settings.AUDIO_DIR`/`VIDEO_DIR`, `config.py:42-43`) |
-| 4 | **SQLAlchemy 2.0** (`Mapped[]`, `mapped_column`, `select()`) in all new or modified code. Legacy 1.x is grandfathered only until its module gets tests. | — (video/book/tag closed by media plan Tasks 5/6/8; audio closed by audio plan Task 3, 2026-09-14) |
-| 5 | **Tests run on PostgreSQL** via testcontainers — never SQLite (JSONB/GIN are not expressible there). Never delete a failing test to go green. Write characterization tests before refactoring untested code. TDD per the `test-driven-development` skill (superpowers): characterization first on legacy code, red-green-refactor for new behavior and bugfixes. | — (book/video/tag covered by media plan Tasks 5/6/8; audio covered by audio plan Tasks 1/3, 2026-09-14) |
-| 6 | **Naming:** `PascalCase` classes with no underscores (ruff `N801`); `snake_case` for functions and modules. The full convention is the Naming table under Repository Structure. | — (video rows closed by media plan Task 8; audio rows closed by audio plan Task 3, 2026-09-14) |
+| 1 | **Layering:** router → service → repository → model. Routers never open a session or query directly. Repositories never raise `HTTPException`. Business rules live in services. | — |
+| 2 | **Error mapping:** services raise domain exceptions; **only routers** translate them. `ValueError`→400, `PermissionError`→403, not-found→404, `IntegrityError`→400. The same rule returns the same status on every endpoint. | — |
+| 3 | **No CWD-relative file I/O.** Every filesystem path derives from `app/config.py` settings anchored to `BASE_DIR`. Never a bare relative string. | — |
+| 4 | **SQLAlchemy 2.0** (`Mapped[]`, `mapped_column`, `select()`) in all new or modified code. Legacy 1.x is grandfathered only until its module gets tests. | — |
+| 5 | **Tests run on PostgreSQL** via testcontainers — never SQLite (JSONB/GIN are not expressible there). Never delete a failing test to go green. Write characterization tests before refactoring untested code. TDD per the `test-driven-development` skill (superpowers): characterization first on legacy code, red-green-refactor for new behavior and bugfixes. | — |
+| 6 | **Naming:** `PascalCase` classes with no underscores (ruff `N801`); `snake_case` for functions and modules. The full convention is the Naming table under Repository Structure. | — |
 
 ## Repository Structure
 
@@ -133,7 +124,7 @@ Where things go:
 - **New setting or path** → `config.py`. Never a literal in a router.
 - **New model** → define it, then export it from `models/__init__.py`, or `Base.metadata` will not see it and Alembic will generate a `drop_table` for it.
 - **Cross-module helper** → a service. Do not create a `utils` grab-bag.
-- **Feature specs** → `docs/devs/specs/`, hand-written and tracked — for ongoing features, readable without any plugin. See "Docs" below.
+- **Feature specs** → `docs/devs/specs/` (see "Docs" below).
 
 ### Naming
 
@@ -151,7 +142,7 @@ Invariant 6 is the enforceable core; this table is the full convention. Where th
 | Tests | `tests/<area>/test_<module>_<aspect>.py` (`test_book_stream.py`, `test_video_api.py`) | consistent |
 | Settings | `UPPER_CASE` fields and properties on `Settings` (`N802` per-file-ignore on `config.py`) | consistent |
 
-`frontend/` (TypeScript + Vite SPA) lives on the **`frontend` branch** (scaffold landed 2026-09-01, moved off this tree in `358bb45`; merged back when the React track starts): it pins to the frozen backend contract in `docs/devs/specs/react-kickoff-annex.md` — response shapes may gain fields, never lose or rename them; API calls go through the same-origin nginx (`/api/*`); media via `/static/covers/` (public) and blob-URL fetches for protected streams. Backend boundaries in this file are unchanged by frontend work.
+`frontend/` (TypeScript + Vite SPA) lives on the **`frontend` branch**, pinned to the frozen backend contract in `docs/devs/specs/react-kickoff-annex.md`: response shapes may gain fields, never lose or rename them; API calls go through same-origin nginx (`/api/*`); media via `/static/covers/` (public) and blob-URL fetches for protected streams. The frozen-contract rule binds backend work on every branch.
 
 ## Best Practices
 
@@ -170,15 +161,13 @@ Advisory, not binding — apply judgment. Each of these is a lesson already paid
 
 ## Execution Boundaries
 
-- ✅ **Always do:** Add strict type hints to every new Python function.
-- ✅ **Always do:** Use Pydantic schemas at API boundaries — request and response bodies. Internal function arguments can be plain types; do not wrap everything in a model.
-- ⚠️ **Ask first:** Before modifying database schemas, adding a migration, or refactoring core request routing.
-- 🚫 **Never do:** Delete a failing test to make the suite pass. Fix the underlying logic.
-- 🚫 **Never do:** Claim something passes without pasting the command output that proves it.
+- ✅ **Always:** strict type hints on every new Python function.
+- ✅ **Always:** Pydantic schemas at API boundaries — request and response bodies. Internal function arguments can be plain types; do not wrap everything in a model.
+- The ask-first and never-do rules live elsewhere and are not repeated here: "Before making any change" §4 (schema, migrations, routing), invariant 5 (never delete a failing test), the Response contract (never claim a pass without output).
 
 ## Build & Test Commands (Definition of Done)
 
-This section is the single owner of the DoD. `ONBOARDING.md`, `CONTRIBUTING.md`, and `.opencode/agent/review.md` point here; `.github/workflows/ci.yml` is the executable mirror. Lint, format, type, and test configuration live in `backend/pyproject.toml` — never as CLI flags.
+This section is the single owner of the DoD. `ONBOARDING.md`, `CONTRIBUTING.md`, and `.opencode/agents/review.md` point here; `.github/workflows/ci.yml` is the executable mirror. Lint, format, type, and test configuration live in `backend/pyproject.toml` — never as CLI flags.
 
 Nothing is "done" until these have actually run and you have seen the output. All commands run from `backend/`.
 
@@ -205,27 +194,27 @@ uv run pytest
 Notes that make the difference between these working and not:
 
 - **`uv run` is mandatory.** A bare `pytest` or `ruff` uses whatever is on PATH, not `backend/.venv`.
-- **mypy on changed files only.** `mypy . --strict` across the repo can surface debt in files unrelated to your change. Test modules run under a relaxed per-module override in `pyproject.toml`; app code is fully strict.
-- **Tests need a running Docker daemon** — the testcontainers harness starts its own `postgres:16-alpine`. You do **not** need `docker compose up -d db` for tests. Verbosity is set by `addopts` in `pyproject.toml`; do not add `-v`/`-q` by hand.
-- **CI runs the check variant on changed Python files only** (`ci.yml` "Resolve changed Python files"); the `review` agent runs it on `.`. Docs-only PRs (markdown and `docs/**` only) additionally skip the test step in CI (`ci.yml` "Detect docs-only change") — the local DoD is unchanged and the `quality` check still reports.
+- **mypy on changed files only.** `mypy . --strict` across the repo surfaces debt unrelated to your change. Test modules run under a relaxed per-module override in `pyproject.toml`; app code is fully strict.
+- **Tests need a running Docker daemon** — testcontainers starts its own `postgres:16-alpine`; you do **not** need `docker compose up -d db`. Verbosity is set by `addopts` in `pyproject.toml`; do not add `-v`/`-q` by hand.
+- **CI runs the check variant on changed Python files only** (`ci.yml` "Resolve changed Python files"); the `review` agent runs it on `.`. Docs-only PRs additionally skip the test step in CI (`ci.yml` "Detect docs-only change") — the local DoD is unchanged and the `quality` check still reports.
 
 ## The one process gate: the reviewer
 
-There is no mandated workflow — work how you like. A change is done when the `review` agent passes it locally (`@review …` or `/done`) and CI is green (`quality`, `docker-build`, `ai-review`), and the GitHub ruleset in `.github/rulesets/protected-branches.json` makes those checks a hard requirement to merge into `master` or `refactor`. What the reviewer passes is good enough.
+There is no mandated workflow — work how you like. A change is done when the `review` agent passes it locally (`@review …` or `/done`) and CI is green (`quality`, `docker-build`, `ai-review`); the GitHub ruleset in `.github/rulesets/protected-branches.json` makes those checks a hard requirement to merge into `master` or `refactor`. What the reviewer passes is good enough.
 
 ## Failure Protocol
 
-- Missing dependency → check `backend/pyproject.toml`, then `uv add <pkg>` (asks for confirmation; it updates `pyproject.toml` and `uv.lock` together). Never hand-edit either file. There is no `requirements.txt`; do not create one.
-- Test fails after **3 consecutive autonomous attempts** → STOP. Do not keep looping. Print the exact failing output and ask for direction.
+- Missing dependency → check `backend/pyproject.toml`, then `uv add <pkg>` (asks for confirmation; updates `pyproject.toml` and `uv.lock` together). Never hand-edit either file. There is no `requirements.txt`; do not create one.
+- Any problem fails after **3 consecutive autonomous attempts** → STOP. Do not loop. Print the exact failing output and ask for direction.
 - Config or tooling behaving unexpectedly → read the schema or run `--help` before guessing. Report what you found.
 
 ## Superpowers
 
-The `superpowers` plugin is pinned in `.opencode/opencode.jsonc` and supplies process skills: `brainstorming`, `writing-plans`, `subagent-driven-development`, `test-driven-development`, `systematic-debugging`, `verification-before-completion`. Use them when they fit. Two rules:
+The `superpowers` plugin (pinned in `.opencode/opencode.jsonc`) supplies process skills: `brainstorming`, `writing-plans`, `subagent-driven-development`, `test-driven-development`, `systematic-debugging`, `verification-before-completion`. Use them when they fit. Two rules:
 
 - **This file outranks any skill.** Where a skill's default conflicts with a rule here (paths, permissions, the reviewer as the gate), this file wins.
-- **Skill output is an artifact, not a gate.** A skill may write a spec or plan (its default is `docs/superpowers/`, gitignored — this file's paths win where they differ); that document is a local design record, untracked by git. If a design must live on, promote it by hand into `docs/devs/specs/`. It does not become a required step for anyone, and the reviewer remains the only gate.
+- **Skill output is an artifact, not a gate.** A spec or plan a skill writes (default `docs/superpowers/`, gitignored) is a local design record; promote it by hand into `docs/devs/specs/` if the design must live on. The reviewer remains the only gate.
 
 ## Docs
 
-`docs/devs/` holds the developer guidebook (`onboarding.md` concepts, `operations.md` runbook, `decisions.md` log) and `specs/` — hand-written specs for ongoing features, readable without the superpowers plugin. Skill-generated artifacts are untracked local state (`docs/superpowers/`, gitignored); historical ones recover from git history (`git log --follow -- docs/devs/<path>`). All of it is optional and never a gate (see Superpowers).
+`docs/devs/` holds the developer guidebook (`onboarding.md` concepts, `operations.md` runbook, `decisions.md` log) and `specs/` — hand-written specs for ongoing features, readable without any plugin. Skill-generated artifacts are untracked local state (`docs/superpowers/`, gitignored); historical ones recover from git history (`git log --follow -- docs/devs/<path>`). All of it is optional and never a gate (see Superpowers).

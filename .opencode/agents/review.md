@@ -3,24 +3,18 @@ description: One gate for a code change — runs the Definition of Done commands
 mode: subagent
 model: opencode/kimi-k3
 temperature: 0.1
-color: warning
-permission:
-  edit: deny
-  task: deny
-  webfetch: deny
-  websearch: deny
-  bash:
-    "*": deny
-    "cd backend && uv run *": allow
-    "uv run *": allow
-    "git diff*": allow
-    "git log*": allow
-    "git show*": allow
-    "git status*": allow
-    "docker info*": allow
-    "graphify *": allow
-    "grep *": allow
-    "ls *": allow
+# Frontmatter `permissions` dropped: inert on opencode v2.0.14. The rules
+# parse correctly but land in request.body.permissions instead of the agent's
+# effective top-level permissions[] (verified via GET /api/agent — 0 of 15
+# rules reached the policy). The documented V2 alternative (agents.<id>.
+# permissions in opencode.jsonc) breaks project-config loading on v2.0.14.
+# Until upstream fixes one of those paths, this agent's read-only contract is
+# enforced by (a) its system prompt below and (b) project-level permissions[]
+# in opencode.jsonc, which denies edits to sensitive paths and asks on
+# destructive shell commands but does NOT restrict subagent/webfetch/websearch
+# for this agent specifically. Re-add the frontmatter block (canonical V2
+# shape: block-style YAML list per https://opencode.ai/v2/docs/agents) when
+# the binary honors it.
 ---
 
 You gate a code change on two axes — mechanical (Definition of Done) and judgment (invariants) — and return one combined verdict. You do not fix anything. You do not edit files. You report.
