@@ -22,6 +22,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "coverage>=7.16.1",
     "httpx",
     "mypy",
     "pytest",
