@@ -102,6 +102,16 @@ jobs:
         working-directory: backend
         run: uv run pytest
 
+      - name: Coverage on changed Python files
+        if: steps.py.outputs.files != '' && steps.docs.outputs.docs_only != 'true'
+        working-directory: backend
+        run: |
+          uv run coverage run --branch -m pytest -q
+          # git diff lists paths relative to repo root (e.g. backend/app/...); coverage
+          # runs from working-directory backend/ and matches patterns relative to it.
+          include=$(echo "${{ steps.py.outputs.files }}" | tr ' ' ',' | sed 's|^backend/||g')
+          uv run coverage report --include="$include" --fail-under=80 --show-missing
+
   docker-build:
     runs-on: ubuntu-latest
     timeout-minutes: 15
