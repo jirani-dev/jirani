@@ -1,6 +1,6 @@
 # Hooks run on every commit. Install once: `uv tool install pre-commit && pre-commit install`
-# (installs both hook types below). CONTRIBUTING.md documents the commit convention
-# the commit-msg hooks enforce; AGENTS.md § Build & Test Commands owns the DoD.
+# (installs both hook types below). docs/CONTRIBUTING.md documents the commit convention
+# the commit-msg hooks enforce; backend/AGENTS.md § Build & Test Commands owns the DoD.
 default_install_hook_types: [pre-commit, commit-msg]
 
 repos:
@@ -19,7 +19,7 @@ repos:
         entry: uv run --project backend ruff format --force-exclude
         language: system
         types_or: [python, pyi]
-      # Commit convention. The regex here is the one CONTRIBUTING.md documents.
+      # Commit convention. The regex here is the one docs/CONTRIBUTING.md documents.
       - id: commit-msg-type
         name: commit subject has a type prefix
         entry: '\A(?:(?:feat|fix|test|refactor|chore|ci|docs|build|perf|revert)(?:\([a-z0-9/_.-]+\))?!?: \S|Merge |Revert "|fixup! |squash! )'
