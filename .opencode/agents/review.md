@@ -95,7 +95,7 @@ INVARIANT AUDIT
 2. Error mapping       PASS
 3. CWD-relative I/O    PASS
 4. SQLAlchemy 2.0      PASS
-5. Tests on Postgres   PRE-EXISTING (audio module, untouched)
+5. Tests on Postgres   PRE-EXISTING (untouched file)
 6. Naming              PASS
 7. Frozen contract     PASS
 F1–F6 Frontend         N/A
