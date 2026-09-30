@@ -41,7 +41,7 @@ jobs:
         if: env.HAS_CODE == 'true'
         run: npm install -g opencode-ai
 
-      - name: Assemble prompt (boilerplate + AGENTS.md invariants + diff)
+      - name: Assemble prompt (boilerplate + invariants + diff)
         if: env.HAS_CODE == 'true'
         run: |
           backend_rules=$(sed -n '/^## System Design/,/^## Repository Structure/p' backend/AGENTS.md)
