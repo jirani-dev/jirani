@@ -44,6 +44,8 @@
     { "action": "edit",    "resource": "docker-compose.yml",     "effect": "deny" },
     { "action": "edit",    "resource": "backend/pyproject.toml", "effect": "deny" },
     { "action": "edit",    "resource": "backend/app/**",         "effect": "ask" },
+    { "action": "edit",    "resource": "frontend/package.json",  "effect": "deny" },
+    { "action": "edit",    "resource": "frontend/src/**",        "effect": "ask" },
 
     { "action": "shell",   "resource": "*",                      "effect": "allow" },
     { "action": "shell",   "resource": "git commit*",            "effect": "ask" },
@@ -58,6 +60,9 @@
     { "action": "shell",   "resource": "docker compose down*",   "effect": "ask" },
     { "action": "shell",   "resource": "psql*",                  "effect": "ask" },
     { "action": "shell",   "resource": "uv add*",                "effect": "ask" },
-    { "action": "shell",   "resource": "uv remove*",             "effect": "ask" }
+    { "action": "shell",   "resource": "uv remove*",             "effect": "ask" },
+    { "action": "shell",   "resource": "npm install ?*",         "effect": "ask" },
+    { "action": "shell",   "resource": "npm i ?*",               "effect": "ask" },
+    { "action": "shell",   "resource": "npm uninstall ?*",       "effect": "ask" }
   ]
 }
