@@ -375,13 +375,14 @@ a test. Each new public function in `activity_service` has ≥ 2 unit tests
 
 ## 12. Frontend impact
 
-The React frontend (currently scaffolded on the `frontend` branch, frozen
-contract at `react-kickoff-annex.md`) consumes two new endpoints:
+The React frontend (`frontend/`; frozen contract at `../frontend.md` §2.1)
+consumes two new endpoints:
 
 1. `POST /api/activities/heartbeat`
 2. `GET /api/students/{account_id}/activities` (librarian/teacher role)
 
-Adding endpoints is an additive contract change permitted by the annex.
+Adding endpoints is an additive contract change permitted by the frozen
+contract.
 Adding fields to the existing response shapes is also additive — existing
 frontend code keeps working. This design does **not** remove or rename any
 existing field.

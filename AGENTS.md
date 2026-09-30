@@ -93,16 +93,16 @@ Subagents run in a child session with their own context: their tool output — a
      Keep this heading and "## Repository Structure" byte-identical. -->
 ## System Design — Binding Invariants
 
-Six rules. Breaking one requires explicit approval, and you must say which one you are breaking and why. The last column records where the current tree already violates the rule — a known debt, not a licence to add more. The debt is mirrored, machine-readably, in `[tool.ruff.lint.per-file-ignores]` in `backend/pyproject.toml`; when a module is fixed, delete its row here and its line there in the same commit.
+Six rules. Breaking one requires explicit approval, and you must say which one you are breaking and why.
 
-| # | Invariant | Violating today |
-|---|---|---|
-| 1 | **Layering:** router → service → repository → model. Routers never open a session or query directly. Repositories never raise `HTTPException`. Business rules live in services. | — |
-| 2 | **Error mapping:** services raise domain exceptions; **only routers** translate them. `ValueError`→400, `PermissionError`→403, not-found→404, `IntegrityError`→400. The same rule returns the same status on every endpoint. | — |
-| 3 | **No CWD-relative file I/O.** Every filesystem path derives from `app/config.py` settings anchored to `BASE_DIR`. Never a bare relative string. | — |
-| 4 | **SQLAlchemy 2.0** (`Mapped[]`, `mapped_column`, `select()`) in all new or modified code. Legacy 1.x is grandfathered only until its module gets tests. | — |
-| 5 | **Tests run on PostgreSQL** via testcontainers — never SQLite (JSONB/GIN are not expressible there). Never delete a failing test to go green. Write characterization tests before refactoring untested code. TDD per the `test-driven-development` skill (superpowers): characterization first on legacy code, red-green-refactor for new behavior and bugfixes. | — |
-| 6 | **Naming:** `PascalCase` classes with no underscores (ruff `N801`); `snake_case` for functions and modules. The full convention is the Naming table under Repository Structure. | — |
+| # | Invariant |
+|---|---|
+| 1 | **Layering:** router → service → repository → model. Routers never open a session or query directly. Repositories never raise `HTTPException`. Business rules live in services. |
+| 2 | **Error mapping:** services raise domain exceptions; **only routers** translate them. `ValueError`→400, `PermissionError`→403, not-found→404, `IntegrityError`→400. The same rule returns the same status on every endpoint. |
+| 3 | **No CWD-relative file I/O.** Every filesystem path derives from `app/config.py` settings anchored to `BASE_DIR`. Never a bare relative string. |
+| 4 | **SQLAlchemy 2.0** (`Mapped[]`, `mapped_column`, `select()`) everywhere. |
+| 5 | **Tests run on PostgreSQL** via testcontainers — never SQLite (JSONB/GIN are not expressible there). Never delete a failing test to go green. Write characterization tests before refactoring untested code. TDD per the `test-driven-development` skill (superpowers): characterization first on legacy code, red-green-refactor for new behavior and bugfixes. |
+| 6 | **Naming:** `PascalCase` classes with no underscores (ruff `N801`); `snake_case` for functions and modules. The full convention is the Naming table under Repository Structure. |
 
 ## Repository Structure
 
@@ -128,21 +128,21 @@ Where things go:
 
 ### Naming
 
-Invariant 6 is the enforceable core; this table is the full convention. Where the tree is inconsistent, the rule names the target and the rename happens when that module is next touched — not in a drive-by.
+Invariant 6 is the enforceable core; this table is the full convention.
 
-| Thing | Rule | Today |
-|---|---|---|
-| Classes | `PascalCase`, no underscores (ruff `N801`) | consistent |
-| Schemas | `<Entity>Base / Create / Read / Update`; request/response pairs `<Verb><Noun>Request / Response`; paged lists `Page[T]` | consistent |
-| Route prefixes | plural noun: `/books`, `/videos`, `/tags`, `/authors` | `/audio` kept (mass noun; locked by audio plan, 2026-09-14) |
-| Handlers | `list_<plural>`, `get_<singular>`, `upload_<singular>`, `update_<singular>`, `delete_<singular>`, `stream_<singular>` | `get_all_tags`, `get_videos`, `upload_file` — rename when touched |
-| Domain exceptions | `<Noun><State>` with no `Error` suffix (`BookNotFound`, `InvalidMediaFile`); base classes `<Area>Error` (`BookError`, `MediaError`). ruff `N818` is ignored for this reason. | consistent |
-| Services / repos | `<Entity>Service`, `<Entity>Repo`; leaf helpers named for what they do (`ContentValidator`, `MediaFileStorage`) | consistent |
-| Modules | `snake_case`; `<entity>_router.py`, `<entity>_schema.py`, `<entity>_repo.py`, `<entity>_service.py`, `<area>_errors.py` | consistent |
-| Tests | `tests/<area>/test_<module>_<aspect>.py` (`test_book_stream.py`, `test_video_api.py`) | consistent |
-| Settings | `UPPER_CASE` fields and properties on `Settings` (`N802` per-file-ignore on `config.py`) | consistent |
+| Thing | Rule |
+|---|---|
+| Classes | `PascalCase`, no underscores (ruff `N801`) |
+| Schemas | `<Entity>Base / Create / Read / Update`; request/response pairs `<Verb><Noun>Request / Response`; paged lists `Page[T]` |
+| Route prefixes | plural noun: `/books`, `/videos`, `/tags`, `/authors`; exception `/audio` (mass noun — locked by the audio plan, 2026-09-14) |
+| Handlers | `list_<plural>`, `get_<singular>`, `upload_<singular>`, `update_<singular>`, `delete_<singular>`, `stream_<singular>` |
+| Domain exceptions | `<Noun><State>` with no `Error` suffix (`BookNotFound`, `InvalidMediaFile`); base classes `<Area>Error` (`BookError`, `MediaError`). ruff `N818` is ignored for this reason. |
+| Services / repos | `<Entity>Service`, `<Entity>Repo`; leaf helpers named for what they do (`ContentValidator`, `MediaFileStorage`) |
+| Modules | `snake_case`; `<entity>_router.py`, `<entity>_schema.py`, `<entity>_repo.py`, `<entity>_service.py`, `<area>_errors.py` |
+| Tests | `tests/<area>/test_<module>_<aspect>.py` (`test_book_stream.py`, `test_video_api.py`) |
+| Settings | `UPPER_CASE` fields and properties on `Settings` (`N802` per-file-ignore on `config.py`) |
 
-`frontend/` (TypeScript + Vite SPA) lives on the **`frontend` branch**, pinned to the frozen backend contract in `docs/devs/specs/react-kickoff-annex.md`: response shapes may gain fields, never lose or rename them; API calls go through same-origin nginx (`/api/*`); media via `/static/covers/` (public) and blob-URL fetches for protected streams. The frozen-contract rule binds backend work on every branch.
+The React SPA lives in `frontend/` (TypeScript + Vite), governed by "Frontend — Binding Invariants & DoD" below and the guide at `docs/devs/frontend.md`. What binds backend work regardless: the frozen contract in `docs/devs/frontend.md` §2.1 — response shapes may gain fields, never lose or rename them.
 
 ## Best Practices
 
@@ -197,6 +197,54 @@ Notes that make the difference between these working and not:
 - **mypy on changed files only.** `mypy . --strict` across the repo surfaces debt unrelated to your change. Test modules run under a relaxed per-module override in `pyproject.toml`; app code is fully strict.
 - **Tests need a running Docker daemon** — testcontainers starts its own `postgres:16-alpine`; you do **not** need `docker compose up -d db`. Verbosity is set by `addopts` in `pyproject.toml`; do not add `-v`/`-q` by hand.
 - **CI runs the check variant on changed Python files only** (`ci.yml` "Resolve changed Python files"); the `review` agent runs it on `.`. Docs-only PRs additionally skip the test step in CI (`ci.yml` "Detect docs-only change") — the local DoD is unchanged and the `quality` check still reports.
+
+## Frontend — Binding Invariants & DoD
+
+These rules bind **all frontend work in `frontend/`**, on every branch, from
+the next commit. Long form, integration patterns, and the frozen backend
+contract (§2.1): `docs/devs/frontend.md`. Breaking a rule below requires
+explicit approval, same as the backend invariants.
+
+| # | Invariant |
+|---|---|
+| F1 | **Verify everything.** Nothing is done until `tsc --strict`, ESLint over *all* `.ts`/`.tsx`, and the test suite have actually run and passed — locally (DoD below) and in CI. A check that doesn't exist doesn't count. |
+| F2 | **Tests are the contract.** Every behavior change ships with tests; a bugfix starts with a failing test reproducing the bug. Never delete or skip a failing test to go green. (Frontend twin of backend invariant 5.) |
+| F3 | **The generated client is the only HTTP path.** All API calls go through the OpenAPI-generated client (`openapi-typescript` + `openapi-fetch`) with the Bearer auth wrapper. Never hand-write endpoint URLs, methods, or response types; never hand-edit generated files — regenerate, commit the diff. |
+| F4 | **Frozen contract.** Response shapes may gain fields, never lose or rename them (`docs/devs/frontend.md` §2.1). A codegen diff that removes or renames a pinned field requires explicit approval in the same PR. |
+| F5 | **Client-side gating is UX, never security.** Route/role gating is convenience; enforcement lives in the backend (`RoleChecker`). Tokens travel only via the wrapper; a 401 triggers the re-login flow, not a hidden button. Native media tags ride the `httpOnly` cookie (PR #42; guide §3.2–3.3). |
+| F6 | **Config centralized, everything TypeScript.** All env/config reads go through one typed, validated settings module (`src/config.ts`). No `.js`/`.jsx` app files — the entry point included. No scattered `import.meta.env`, no literal API URLs in components. |
+
+Two reproducibility rules ride along: **npm with `package-lock.json`
+committed**, and **CI runs the frontend DoD on any PR touching `frontend/`** —
+wired when the scripts exist to run.
+
+**Definition of Done (frontend)** — the command contract frontend work must
+satisfy; the canonical npm script names are part of the contract. The backend
+DoD section above remains the single owner of backend commands.
+
+```bash
+cd frontend
+npm ci
+npm run lint          # ESLint flat config, includes .tsx
+npm run typecheck     # tsc --strict --noEmit
+npm run test          # Vitest + Testing Library
+npm run build         # production build must succeed
+npm run generate-api && git diff --exit-code src/api/generated   # drift gate
+npm run e2e           # Playwright — once the harness exists
+```
+
+**Naming & file layout** — layer-based:
+
+| Thing | Rule |
+|---|---|
+| Components | `PascalCase`, one per file: `components/<area>/BookCard.tsx` |
+| Pages | `pages/<Name>.tsx`, wired in one router module |
+| Hooks | `hooks/use<Name>.ts` |
+| Generated API | `src/api/generated/**` — never hand-edited (F3) |
+| API wrappers | `src/api/<entity>.ts` — thin domain functions over the generated client, no raw fetch |
+| Settings | `src/config.ts` — typed, validated, the only env reader (F6) |
+| Tests | co-located `*.test.ts(x)`; E2E in `e2e/` |
+| npm scripts | canonical: `dev`, `lint`, `typecheck`, `test`, `build`, `generate-api`, `e2e` |
 
 ## The one process gate: the reviewer
 

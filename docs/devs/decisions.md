@@ -117,3 +117,18 @@ problem → choice → consequence, ending with the artifact that owns it.
     under `docs/devs/specs/` is hand-written specs for ongoing features
     only. Executed plans remain recoverable from git history. Owner:
     `.gitignore`, `AGENTS.md` "Docs" and "Superpowers".
+21. **Frontend rules land ahead of the code they govern** — the `frontend/`
+    tree (React 19 + TypeScript + Vite) predates the frontend invariants
+    (F1–F6) and the frontend DoD; rather than wait for compliance, the rules
+    bind every frontend change from the next commit, and the tree is brought
+    up to them as work touches it (test harness, lint over `.tsx`, generated
+    API client, committed lockfile). The React Kickoff Annex
+    (`docs/devs/specs/react-kickoff-annex.md`) was deleted once
+    `docs/devs/frontend.md` superseded it — its media-access section was
+    contradicted by the cookie-based stream auth shipped in PR #42
+    (`1e22cee`), and the frozen backend contract now lives in the guide's
+    §2.1. Ruleset documents carry no debt or history: the invariant table's
+    "Violating today" column and its mirroring mechanism were removed
+    (superseding the debt-mirror description in #16; the `pyproject.toml`
+    comment follows by hand). Lessons live here instead. Owner: `AGENTS.md`
+    "Frontend — Binding Invariants & DoD", `docs/devs/frontend.md`.

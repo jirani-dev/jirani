@@ -53,6 +53,8 @@ ships as Docker containers.
 | Open a pull request | `CONTRIBUTING.md` |
 | Know the binding rules | `AGENTS.md` |
 | Understand why things are the way they are | `docs/devs/decisions.md` |
+| Learn the frontend rules and integration contract | `docs/devs/frontend.md` |
 
 **Stack:** Python · FastAPI · PostgreSQL 16 · SQLAlchemy 2.0 · Alembic ·
-nginx · Docker. A React SPA is scaffolded on the `frontend` branch.
+nginx · Docker · React. The SPA (`frontend/`) is built against the frozen
+contract in `docs/devs/frontend.md` §2.1.
