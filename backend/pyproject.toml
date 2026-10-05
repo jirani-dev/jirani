@@ -22,6 +22,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "coverage>=7.16.1",
     "httpx",
     "mypy",
     "pytest",
@@ -33,7 +34,6 @@ dev = [
 testpaths = ["app/tests"]
 pythonpath = ["."]
 addopts = "--tb=short"
-
 
 [tool.ruff]
 line-length = 88
@@ -47,8 +47,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-# Known debt from the AGENTS.md invariant table, machine-readable.
-# Delete a line when its module is fixed; the AGENTS.md row goes with it.
+# Per-file exceptions to ruff rules; each line says why.
 "app/config.py" = ["N802"]                   # ALLOWED_EXTENSIONS / ALLOWED_IMAGE_EXTENSIONS are @property constants — intentional
 
 [tool.mypy]

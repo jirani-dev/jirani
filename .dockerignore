@@ -10,9 +10,8 @@ uploads/
 
 # OpenCode / dev docs
 .opencode/
-AGENTS.md
-docs/devs/
-docs/superpowers/
+**/AGENTS.md
+docs/
 .graphifyignore
 graphify-out/
 

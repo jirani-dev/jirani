@@ -47,12 +47,9 @@ ships as Docker containers.
 
 | I want to… | Go to |
 |---|---|
-| Run it | `docs/devs/operations.md` |
-| Join the team and learn the AI-assisted workflow | `ONBOARDING.md` |
-| Learn backend concepts as a newcomer | `docs/devs/onboarding.md` |
-| Open a pull request | `CONTRIBUTING.md` |
-| Know the binding rules | `AGENTS.md` |
-| Understand why things are the way they are | `docs/devs/decisions.md` |
+| Set up, run it, and learn the workflow | `docs/onboarding.md` |
+| Open a pull request | `docs/CONTRIBUTING.md` |
+| Know the rules | `AGENTS.md`, `backend/AGENTS.md`, `frontend/AGENTS.md` |
 
 **Stack:** Python · FastAPI · PostgreSQL 16 · SQLAlchemy 2.0 · Alembic ·
-nginx · Docker. A React SPA is scaffolded on the `frontend` branch.
+nginx · Docker · React (`frontend/`).

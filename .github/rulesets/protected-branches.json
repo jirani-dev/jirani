@@ -30,7 +30,8 @@
         "required_status_checks": [
           { "context": "quality" },
           { "context": "docker-build" },
-          { "context": "ai-review" }
+          { "context": "ai-review" },
+          { "context": "frontend" }
         ]
       }
     }

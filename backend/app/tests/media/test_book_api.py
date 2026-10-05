@@ -461,8 +461,29 @@ def test_stream_unauthenticated_401(
     uid = "abc123"
     (tmp_path / f"{uid}.pdf").write_bytes(b"%PDF-1.4 mock")
     _seed_book(db, uid=uid, file_path=f"{uid}.pdf")
+    # stream_env's login left an access_token cookie on this client — clear
+    # it so the request truly carries no credentials (auth also falls back
+    # to that cookie now, for native <audio>/<video> tags that can't send a
+    # Bearer header).
+    client.cookies.clear()
     response = client.get(f"/books/{uid}/stream")
     assert response.status_code == 401
+
+
+def test_stream_cookie_only_auth_204(
+    db: Session, client: TestClient, stream_env: tuple[Path, dict[str, str]]
+) -> None:
+    # stream_env's login left a valid access_token cookie on this client.
+    # A native media tag can't send a custom Authorization header, so the
+    # cookie alone must be enough — this is the exact codepath the
+    # fallback in app/dependencies/auth.py exists for.
+    tmp_path, _ = stream_env
+    uid = "cookieauth"
+    (tmp_path / f"{uid}.pdf").write_bytes(b"%PDF-1.4 mock")
+    _seed_book(db, uid=uid, file_path=f"{uid}.pdf")
+    response = client.get(f"/books/{uid}/stream")
+    assert response.status_code == 204
+    assert response.headers["X-Accel-Redirect"] == f"/media/books/{quote(uid)}.pdf"
 
 
 def test_stream_epub_content_type(
@@ -675,5 +696,27 @@ def test_read_unauthenticated_401(
     uid = "noauth"
     (tmp_path / f"{uid}.pdf").write_bytes(b"%PDF-1.4 mock")
     _seed_book(db, uid=uid, file_path=f"{uid}.pdf")
+    # read_env's login left an access_token cookie on this client — clear it
+    # so the request truly carries no credentials (auth also falls back to
+    # that cookie now, for native <audio>/<video> tags that can't send a
+    # Bearer header).
+    client.cookies.clear()
     response = client.get(f"/books/{uid}/read")
     assert response.status_code == 401
+
+
+def test_read_cookie_only_auth_204(
+    db: Session, client: TestClient, read_env: tuple[Path, dict[str, str]]
+) -> None:
+    # read_env's login left a valid access_token cookie on this client.
+    # usePdfViewer fetches this endpoint from the browser and must
+    # authenticate via that cookie alone when no Bearer header is sent —
+    # this is the exact codepath the fallback in app/dependencies/auth.py
+    # exists for.
+    tmp_path, _ = read_env
+    uid = "cookieread"
+    (tmp_path / f"{uid}.pdf").write_bytes(b"%PDF-1.4 mock")
+    _seed_book(db, uid=uid, file_path=f"{uid}.pdf")
+    response = client.get(f"/books/{uid}/read")
+    assert response.status_code == 204
+    assert response.headers["X-Accel-Redirect"] == f"/media/books/{quote(uid)}.pdf"

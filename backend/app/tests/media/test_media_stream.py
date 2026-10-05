@@ -80,8 +80,26 @@ def test_stream_unauthenticated_401(db, client, stream_env):
     tmp_path, _ = stream_env
     (tmp_path / "clip.mp4").write_bytes(b"mock bytes")
     vid = _seed_video(db, file_path="clip.mp4")
+    # stream_env's login left an access_token cookie on this client — clear it
+    # so the request truly carries no credentials (auth also falls back to
+    # that cookie now, for native <audio>/<video> tags that can't send a
+    # Bearer header).
+    client.cookies.clear()
     response = client.get(f"/videos/stream/{vid.id}")
     assert response.status_code == 401
+
+
+def test_stream_cookie_only_auth_204(db, client, stream_env):
+    # stream_env's login left a valid access_token cookie on this client.
+    # A native <video src> request can't send a custom Authorization
+    # header, so the cookie alone must be enough — this is the exact
+    # codepath the fallback in app/dependencies/auth.py exists for.
+    tmp_path, _ = stream_env
+    (tmp_path / "clip.mp4").write_bytes(b"mock bytes")
+    vid = _seed_video(db, file_path="clip.mp4")
+    response = client.get(f"/videos/stream/{vid.id}")
+    assert response.status_code == 204
+    assert response.headers["X-Accel-Redirect"] == "/media/videos/clip.mp4"
 
 
 def test_stream_spaced_filename_quoted(db, client, stream_env):
@@ -166,8 +184,27 @@ def test_audio_stream_unauthenticated_401(db, client, audio_stream_env):
     tmp_path, _ = audio_stream_env
     (tmp_path / "clip.mp3").write_bytes(b"mock bytes")
     track = _seed_audio(db, file_path="clip.mp3")
+    # audio_stream_env's login left an access_token cookie on this client —
+    # clear it so the request truly carries no credentials (auth also falls
+    # back to that cookie now, for native <audio>/<video> tags that can't
+    # send a Bearer header).
+    client.cookies.clear()
     response = client.get(f"/audio/stream/{track.id}")
     assert response.status_code == 401
+
+
+def test_audio_stream_cookie_only_auth_204(db, client, audio_stream_env):
+    # audio_stream_env's login left a valid access_token cookie on this
+    # client. A native <audio src> request can't send a custom
+    # Authorization header, so the cookie alone must be enough — this is
+    # the exact codepath the fallback in app/dependencies/auth.py exists
+    # for.
+    tmp_path, _ = audio_stream_env
+    (tmp_path / "clip.mp3").write_bytes(b"mock bytes")
+    track = _seed_audio(db, file_path="clip.mp3")
+    response = client.get(f"/audio/stream/{track.id}")
+    assert response.status_code == 204
+    assert response.headers["X-Accel-Redirect"] == "/media/audio/clip.mp3"
 
 
 def test_audio_stream_spaced_filename_quoted(db, client, audio_stream_env):

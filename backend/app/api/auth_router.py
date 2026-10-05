@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -29,7 +29,9 @@ def get_auth_service(db: Session = Depends(get_db)) -> AuthService:
 
 @router.post("/token", response_model=TokenResponse, status_code=status.HTTP_200_OK)
 async def login(
-    login_data: LoginRequest, auth_service: AuthService = Depends(get_auth_service)
+    login_data: LoginRequest,
+    response: Response,
+    auth_service: AuthService = Depends(get_auth_service),
 ) -> TokenResponse:
     user = auth_service.authenticate_user(login_data.username, login_data.password)
     if not user:
@@ -38,6 +40,18 @@ async def login(
             detail="Incorrect username or password",
         )
     access_token = auth_service.create_token_for_user(user)
+
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,  # JS can't read it — mitigates XSS token theft
+        secure=False,  # plain http:// on your LAN — set True only if you add TLS
+        samesite="strict",  # SPA + API are same-site (localhost) either way —
+        # strict costs nothing here and narrows the CSRF surface for when
+        # state-changing endpoints start accepting cookie-only auth.
+        max_age=60 * 60 * 2,  # matches ACCESS_TOKEN_EXPIRE_MINUTES (120 min)
+    )
+
     return TokenResponse(
         access_token=access_token,
         token_type="bearer",
@@ -45,6 +59,22 @@ async def login(
         role=user.role,
         first_login=user.first_login,
     )
+
+
+@router.post("/logout", status_code=status.HTTP_200_OK)
+async def logout(response: Response) -> dict[str, str]:
+    # No auth required: logout's only job is clearing the cookie, and it
+    # must still succeed against an already-expired or already-cleared
+    # one. (Hook for the activity-tracking spec's
+    # end_active_sessions(account_id) goes here once that feature lands —
+    # it isn't implemented yet, so there's nothing to call.)
+    response.delete_cookie(
+        key="access_token",
+        httponly=True,
+        secure=False,
+        samesite="strict",
+    )
+    return {"message": "Logged out"}
 
 
 @router.post("/reset-password", status_code=status.HTTP_200_OK)
