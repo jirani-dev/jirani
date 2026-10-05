@@ -2,7 +2,7 @@
  * Utility: Format Date
  * Converts ISO date strings to human-readable format
  */
-export function formatDate(dateString) {
+export function formatDate(dateString: string): string {
   const date = new Date(dateString)
   return date.toLocaleDateString('en-US', {
     year: 'numeric',
@@ -15,7 +15,7 @@ export function formatDate(dateString) {
  * Utility: Format Duration
  * Converts seconds to human-readable duration (e.g., "1h 23m 45s")
  */
-export function formatDuration(seconds) {
+export function formatDuration(seconds: number): string {
   if (!seconds || seconds < 0) return '0m'
 
   const hours = Math.floor(seconds / 3600)
@@ -34,7 +34,7 @@ export function formatDuration(seconds) {
  * Utility: Truncate Text
  * Truncates text to a max length and adds ellipsis
  */
-export function truncateText(text, maxLength = 100) {
+export function truncateText(text: string, maxLength = 100): string {
   if (!text || text.length <= maxLength) return text
   return text.slice(0, maxLength) + '...'
 }
