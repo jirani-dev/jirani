@@ -37,10 +37,3 @@ cp /tmp/grill-me/LICENSE .opencode/skills/LICENSE
 
 If upstream ever ships a V2-compatible plugin entrypoint, the plugin form can
 replace this vendored copy.
-
-## systematic-debugging
-
-NOT vendored here — provided by the `superpowers` plugin
-(`superpowers@git+https://github.com/obra/superpowers.git#v6.4.1`), already in
-`opencode.jsonc`. Available as `systematic-debugging`; auto-invoked before
-proposing fixes to any bug, test failure, or unexpected behaviour.

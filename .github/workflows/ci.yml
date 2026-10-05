@@ -1,7 +1,9 @@
-# Executable mirror of AGENTS.md § Build & Test Commands (check variant), scoped to
-# changed Python files. Lint/format/type config lives in backend/pyproject.toml.
-# Docs-only PRs skip the test step (see "Detect docs-only change") — the job still
-# runs so the required `quality` check always reports.
+# Executable mirror of the Definitions of Done: backend/AGENTS.md § Build & Test
+# Commands (check variant, scoped to changed Python files) is the `quality` job;
+# frontend/AGENTS.md § Definition of Done is the `frontend` job. Lint/format/type
+# config lives in backend/pyproject.toml. Docs-only PRs skip the test step (see
+# "Detect docs-only change") — the job still runs so the required `quality` check
+# always reports.
 name: ci
 
 on:
@@ -111,6 +113,52 @@ jobs:
           # runs from working-directory backend/ and matches patterns relative to it.
           include=$(echo "${{ steps.py.outputs.files }}" | tr ' ' ',' | sed 's|^backend/||g')
           uv run coverage report --include="$include" --fail-under=80 --show-missing
+
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Always runs so the required `frontend` check reports on every PR; the
+      # steps below run only when frontend/ changed or the diff range is unknown.
+      - name: Detect frontend change
+        id: fe
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            range="origin/${{ github.event.pull_request.base.ref }}...HEAD"
+          elif [ -n "${{ github.event.before }}" ] && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
+            range="${{ github.event.before }}...HEAD"
+          else
+            range=""
+          fi
+          if [ -z "$range" ] || git diff --name-only "$range" | grep -q '^frontend/'; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-node@v4
+        if: steps.fe.outputs.changed == 'true'
+        with:
+          node-version: "24"
+
+      - name: Install
+        if: steps.fe.outputs.changed == 'true'
+        working-directory: frontend
+        run: npm install
+
+      - name: Lint
+        if: steps.fe.outputs.changed == 'true'
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Build
+        if: steps.fe.outputs.changed == 'true'
+        working-directory: frontend
+        run: npm run build
 
   docker-build:
     runs-on: ubuntu-latest
