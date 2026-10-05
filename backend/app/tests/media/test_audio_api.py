@@ -3,6 +3,7 @@ from pathlib import Path
 from urllib.parse import quote
 
 import pytest
+from sqlalchemy import func, select
 
 import app.api.audio_router as audio_router_module
 from app.config import settings
@@ -58,7 +59,7 @@ def test_get_audio_lists_remaining_track_after_repo_delete(db, client, auth):
     assert response.status_code == 200
     assert {track["id"] for track in response.json()} == {keep.id}
     db.expire_all()
-    assert db.query(Audio).count() == 1
+    assert db.scalar(select(func.count()).select_from(Audio)) == 1
 
 
 def test_upload_happy(db, client, monkeypatch, tmp_path, auth):
@@ -80,7 +81,7 @@ def test_upload_happy(db, client, monkeypatch, tmp_path, auth):
     assert re.fullmatch(r"[0-9a-f-]{36}_song\.mp3", files_on_disk[0].name)
     assert files_on_disk[0].read_bytes() == file_bytes
     db.expire_all()
-    row = db.query(Audio).filter(Audio.id == body["id"]).first()
+    row = db.scalar(select(Audio).where(Audio.id == body["id"]))
     assert row is not None
     assert row.file_path == str((tmp_path / "audio") / files_on_disk[0].name)
 
@@ -99,7 +100,7 @@ def test_upload_tags_stripped_deduped_lowercased(
     body = response.json()
     assert [tag["name"] for tag in body["tags"]] == ["math"]
     db.expire_all()
-    assert db.query(Tag).count() == 1
+    assert db.scalar(select(func.count()).select_from(Tag)) == 1
 
 
 def test_upload_reuses_preexisting_tag_case_insensitive(
@@ -122,7 +123,7 @@ def test_upload_reuses_preexisting_tag_case_insensitive(
     assert body["tags"][0]["id"] == tag.id
     assert body["tags"][0]["name"] == "Math"  # stored case wins
     db.expire_all()
-    assert db.query(Tag).count() == 1
+    assert db.scalar(select(func.count()).select_from(Tag)) == 1
 
 
 def test_upload_txt_rejected_before_disk_write(client, monkeypatch, tmp_path, auth):
@@ -208,12 +209,12 @@ def test_patch_replaces_tags_and_sweeps_orphans(db, client, auth):
     assert body["description"] == "desc"
     assert [tag["name"] for tag in body["tags"]] == ["bass"]
     db.expire_all()
-    row = db.query(Audio).filter(Audio.id == track.id).first()
+    row = db.scalar(select(Audio).where(Audio.id == track.id))
     assert row is not None
     assert [tag.name for tag in row.tags] == ["bass"]
     # Flip target for Task 3 (orphan sweep): the detached tag row is swept.
     # Legacy kept it alive (witnessed red).
-    assert db.query(Tag).filter(Tag.id == old_tag_id).first() is None
+    assert db.scalar(select(Tag).where(Tag.id == old_tag_id)) is None
 
 
 def test_patch_empty_tags_clears_links_and_sweeps_orphans(db, client, auth):
@@ -234,13 +235,13 @@ def test_patch_empty_tags_clears_links_and_sweeps_orphans(db, client, auth):
     assert response.status_code == 200
     assert response.json()["tags"] == []
     db.expire_all()
-    row = db.query(Audio).filter(Audio.id == track.id).first()
+    row = db.scalar(select(Audio).where(Audio.id == track.id))
     assert row is not None
     assert row.tags == []
     # orphan tag: its only link was cleared → row swept (legacy kept it — red)
-    assert db.query(Tag).filter(Tag.id == tag_id).first() is None
+    assert db.scalar(select(Tag).where(Tag.id == tag_id)) is None
     # shared tag: still linked to the other track → survives
-    assert db.query(Tag).filter(Tag.name == "lesson").first() is not None
+    assert db.scalar(select(Tag).where(Tag.name == "lesson")) is not None
 
 
 def test_patch_omitted_fields_unchanged(db, client, auth):
@@ -258,7 +259,7 @@ def test_patch_omitted_fields_unchanged(db, client, auth):
     assert response.json()["title"] == "Keep"
     assert [t["name"] for t in response.json()["tags"]] == ["lesson"]
     db.expire_all()
-    row = db.query(Audio).filter(Audio.id == track.id).first()
+    row = db.scalar(select(Audio).where(Audio.id == track.id))
     assert row is not None
     assert row.title == "Keep"
     assert row.description == "changed"
@@ -271,8 +272,8 @@ def test_patch_missing_404_no_db_change(db, client, auth):
     assert response.status_code == 404
     assert response.json()["detail"] == "Audio not found"
     db.expire_all()
-    assert db.query(Audio).count() == 1
-    row = db.query(Audio).filter(Audio.id == track.id).first()
+    assert db.scalar(select(func.count()).select_from(Audio)) == 1
+    row = db.scalar(select(Audio).where(Audio.id == track.id))
     assert row is not None
     assert row.title == "song"
 
@@ -288,7 +289,7 @@ def test_delete_track_deletes_via_api(db, client, monkeypatch, tmp_path, auth):
     assert response.status_code == 204
     assert response.content == b""
     db.expire_all()
-    assert db.query(Audio).count() == 0
+    assert db.scalar(select(func.count()).select_from(Audio)) == 0
     assert client.get("/audio/", headers=auth).json() == []
     assert not audio_file.exists()
 

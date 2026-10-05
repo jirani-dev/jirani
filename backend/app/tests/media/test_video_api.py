@@ -4,6 +4,7 @@ import re
 from urllib.parse import quote
 
 import pytest
+from sqlalchemy import func, select
 
 import app.api.video_router as video_router_module
 from app.config import settings
@@ -77,7 +78,7 @@ def test_upload_happy(db, client, monkeypatch, tmp_path, auth):
     assert len(files_on_disk) == 1
     assert files_on_disk[0].read_bytes() == b"\x00\x00\x00\x18ftypmp42 mock bytes"
     db.expire_all()
-    row = db.query(Video).filter(Video.id == body["id"]).first()
+    row = db.scalar(select(Video).where(Video.id == body["id"]))
     assert row is not None
 
 
@@ -149,7 +150,7 @@ def test_upload_tags_whitespace_first_seen_reused(
     assert body["tags"][0]["name"] == "math"
     assert body["tags"][0]["id"] is not None
     db.expire_all()
-    assert db.query(Tag).count() == 1
+    assert db.scalar(select(func.count()).select_from(Tag)) == 1
 
 
 def test_upload_tag_reuses_preexisting_row(db, client, monkeypatch, tmp_path, auth):
@@ -170,7 +171,7 @@ def test_upload_tag_reuses_preexisting_row(db, client, monkeypatch, tmp_path, au
     assert body["tags"][0]["id"] == tag.id
     assert body["tags"][0]["name"] == "math"
     db.expire_all()
-    assert db.query(Tag).count() == 1
+    assert db.scalar(select(func.count()).select_from(Tag)) == 1
 
 
 def test_upload_multiple_valid_pair(client, monkeypatch, tmp_path, auth):
@@ -217,7 +218,7 @@ def test_patch_title_description_tags_replace(db, client, auth):
     )
     assert response.status_code == 200
     db.expire_all()
-    row = db.query(Video).filter(Video.id == vid.id).first()
+    row = db.scalar(select(Video).where(Video.id == vid.id))
     assert row is not None
     assert row.title == "New"
     assert row.description == "desc"
@@ -242,13 +243,13 @@ def test_patch_empty_tags_clears_links_and_sweeps_orphans(db, client, auth):
     assert response.status_code == 200
     assert response.json()["tags"] == []
     db.expire_all()
-    row = db.query(Video).filter(Video.id == vid.id).first()
+    row = db.scalar(select(Video).where(Video.id == vid.id))
     assert row is not None
     assert row.tags == []
     # orphan tag: its only link was cleared → row swept
-    assert db.query(Tag).filter(Tag.id == tag_id).first() is None
+    assert db.scalar(select(Tag).where(Tag.id == tag_id)) is None
     # shared tag: still linked to the other video → survives
-    assert db.query(Tag).filter(Tag.name == "lesson").first() is not None
+    assert db.scalar(select(Tag).where(Tag.name == "lesson")) is not None
 
 
 def test_patch_omitted_fields_unchanged(db, client, auth):
@@ -258,7 +259,7 @@ def test_patch_omitted_fields_unchanged(db, client, auth):
     )
     assert response.status_code == 200
     db.expire_all()
-    row = db.query(Video).filter(Video.id == vid.id).first()
+    row = db.scalar(select(Video).where(Video.id == vid.id))
     assert row is not None
     assert row.title == "Keep"
     assert row.description == "changed"
@@ -280,7 +281,7 @@ def test_delete_video_deletes_via_api(db, client, monkeypatch, tmp_path, auth):
     assert response.status_code == 204
     assert response.content == b""
     db.expire_all()
-    assert db.query(Video).count() == 0
+    assert db.scalar(select(func.count()).select_from(Video)) == 0
     assert client.get("/videos/", headers=auth).json() == []
     assert not video_file.exists()
 

@@ -1,4 +1,5 @@
 import pytest
+from sqlalchemy import func, select
 
 from app.models.audio import Audio
 from app.repositories.audio_repo import AudioRepo
@@ -31,8 +32,9 @@ def test_delete_hard_deletes(db):
     track = _seed_audio(db)
     AudioRepo(db).delete(track.id)
     db.expire_all()
-    assert db.query(Audio).filter(Audio.id == track.id).first() is None
-    assert db.query(Audio).count() == 0  # row GONE, not soft-deleted
+    assert db.scalar(select(Audio).where(Audio.id == track.id)) is None
+    # row GONE, not soft-deleted
+    assert db.scalar(select(func.count()).select_from(Audio)) == 0
 
 
 def test_delete_missing_id_raises(db):
