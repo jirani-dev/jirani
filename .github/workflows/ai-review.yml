@@ -19,7 +19,7 @@ jobs:
     timeout-minutes: 15
     env:
       OPENCODE_API_KEY: ${{ secrets.AI_REVIEW_API_KEY }}
-      OPENCODE_CONFIG_CONTENT: '{"permission":{"edit":"deny","bash":"deny","task":"deny"}}'
+      OPENCODE_CONFIG_CONTENT: '{"permissions":[{"action":"edit","resource":"*","effect":"deny"},{"action":"shell","resource":"*","effect":"deny"},{"action":"subagent","resource":"*","effect":"deny"}]}'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -39,7 +39,7 @@ jobs:
 
       - name: Install opencode
         if: env.HAS_CODE == 'true'
-        run: npm install -g opencode-ai
+        run: npm install -g @opencode/cli
 
       - name: Assemble prompt (boilerplate + invariants + diff)
         if: env.HAS_CODE == 'true'
