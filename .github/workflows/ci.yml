@@ -8,9 +8,9 @@ name: ci
 
 on:
   pull_request:
-    branches: [refactor, master]
+    branches: [master]
   push:
-    branches: [refactor, master]
+    branches: [master]
 
 concurrency:
   group: ci-${{ github.ref }}

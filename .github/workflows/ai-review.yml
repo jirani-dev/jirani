@@ -2,7 +2,7 @@ name: ai-review
 
 on:
   pull_request:
-    branches: [refactor, master]
+    branches: [master]
   workflow_dispatch:
 
 concurrency:
