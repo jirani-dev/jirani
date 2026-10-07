@@ -47,6 +47,8 @@ Breaking one requires explicit approval, same as the backend invariants.
 cd frontend
 npm install
 npm run lint
+npm run typecheck
+npm run test
 npm run build
 ```
 

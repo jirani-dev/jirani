@@ -155,6 +155,16 @@ jobs:
         working-directory: frontend
         run: npm run lint
 
+      - name: Typecheck
+        if: steps.fe.outputs.changed == 'true'
+        working-directory: frontend
+        run: npm run typecheck
+
+      - name: Test
+        if: steps.fe.outputs.changed == 'true'
+        working-directory: frontend
+        run: npm run test
+
       - name: Build
         if: steps.fe.outputs.changed == 'true'
         working-directory: frontend
