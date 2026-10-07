@@ -18,14 +18,18 @@ export const PdfCanvas = ({
     const touchStartY = useRef<number | null>(null);
 
     const handleTouchStart = (e: TouchEvent<HTMLDivElement>) => {
-        touchStartX.current = e.touches[0].clientX;
-        touchStartY.current = e.touches[0].clientY;
+        const touch = e.touches[0];
+        if (!touch) return;
+        touchStartX.current = touch.clientX;
+        touchStartY.current = touch.clientY;
     };
 
     const handleTouchEnd = (e: TouchEvent<HTMLDivElement>) => {
+        const touch = e.changedTouches[0];
+        if (!touch) return;
         if (touchStartX.current === null || touchStartY.current === null) return;
-        const dx = e.changedTouches[0].clientX - touchStartX.current;
-        const dy = e.changedTouches[0].clientY - touchStartY.current;
+        const dx = touch.clientX - touchStartX.current;
+        const dy = touch.clientY - touchStartY.current;
         if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 40) {
             if (dx < 0) onSwipeNext();
             else onSwipePrev();
@@ -44,7 +48,7 @@ export const PdfCanvas = ({
             {loading && (
                 <div className="flex items-center gap-2.5 text-[#666] mt-20">
                     <Loader2 size={20} className="animate-spin" />
-                    <span className="font-mono text-sm">Loading book…</span>
+                    <span className="font-mono text-sm">Loading bookï¿½</span>
                 </div>
             )}
             {error && (
