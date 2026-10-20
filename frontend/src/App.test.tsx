@@ -22,9 +22,7 @@ describe('App routing', () => {
     });
 
     it('/video is no longer a route (Decision A)', () => {
-        renderAt('/video');
-        expect(
-            screen.queryByRole('heading', { name: /offlib llc/i }),
-        ).toBeNull();
+        const { container } = renderAt('/video');
+        expect(container).toBeEmptyDOMElement();
     });
 });
