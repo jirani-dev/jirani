@@ -1,5 +1,6 @@
 import * as pdfjsLib from 'pdfjs-dist';
 import { ApiError, apiFetch } from './client';
+import { pageQuery, PageRequest } from './paging';
 import { Book, Page } from '../../types';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
@@ -13,7 +14,7 @@ export function getBookReadUrl(uid: Book['uid']): string {
     return `${BASE}/${uid}/read`;
 }
 
-export interface BookSearchParams {
+export interface BookSearchParams extends PageRequest {
     title?: string;
     author?: string;
     level?: string;
@@ -21,8 +22,6 @@ export interface BookSearchParams {
     language?: string;
     tags?: string[];
     extension?: string;
-    limit?: number;
-    offset?: number;
 }
 
 export async function searchBooks(params: BookSearchParams = {}): Promise<Page<Book>> {
@@ -34,8 +33,9 @@ export async function searchBooks(params: BookSearchParams = {}): Promise<Page<B
     if (params.language?.trim()) query.set('language', params.language.trim());
     if (params.extension?.trim()) query.set('extension', params.extension.trim());
     if (params.tags && params.tags.length > 0) query.set('tags', params.tags.join(','));
-    query.set('limit', String(params.limit ?? 100));
-    query.set('offset', String(params.offset ?? 0));
+    const { limit, offset } = pageQuery(params);
+    query.set('limit', String(limit));
+    query.set('offset', String(offset));
 
     const res = await apiFetch(`${BASE}/?${query}`);
     if (!res.ok) throw await ApiError.fromResponse(res, 'Failed to fetch books');
