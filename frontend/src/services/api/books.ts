@@ -1,5 +1,5 @@
 import * as pdfjsLib from 'pdfjs-dist';
-import { apiFetch, parseErrorDetail } from './client';
+import { ApiError, apiFetch } from './client';
 import { Book, Page } from '../../types';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
@@ -38,7 +38,7 @@ export async function searchBooks(params: BookSearchParams = {}): Promise<Page<B
     query.set('offset', String(params.offset ?? 0));
 
     const res = await apiFetch(`${BASE}/?${query}`);
-    if (!res.ok) throw new Error('Failed to fetch books');
+    if (!res.ok) throw await ApiError.fromResponse(res, 'Failed to fetch books');
     return res.json();
 }
 
@@ -56,7 +56,7 @@ export async function uploadBook(
     if (meta.tags?.trim()) formData.append('tags', meta.tags.trim());
 
     const res = await apiFetch(`${BASE}/upload`, { method: 'POST', body: formData });
-    if (!res.ok) throw new Error(await parseErrorDetail(res, 'Upload failed'));
+    if (!res.ok) throw await ApiError.fromResponse(res, 'Upload failed');
     return res.json();
 }
 
@@ -73,7 +73,7 @@ export async function uploadBooks(
 
 export async function deleteBook(uid: Book['uid']): Promise<void> {
     const res = await apiFetch(`${BASE}/${uid}`, { method: 'DELETE' });
-    if (!res.ok) throw new Error('Delete failed');
+    if (!res.ok) throw await ApiError.fromResponse(res, 'Delete failed');
 }
 
 export async function updateBook(
@@ -90,6 +90,6 @@ export async function updateBook(
     if (fields.cover) formData.append('cover', fields.cover);
 
     const res = await apiFetch(`${BASE}/${uid}`, { method: 'PUT', body: formData });
-    if (!res.ok) throw new Error(await parseErrorDetail(res, 'Update failed'));
+    if (!res.ok) throw await ApiError.fromResponse(res, 'Update failed');
     return res.json();
 }
