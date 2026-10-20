@@ -21,11 +21,12 @@ Breaking one requires explicit approval, and you must say which one you are brea
 
 **Pinned surface (invariant 7):**
 
-- Schemas: `BookRead` (incl. `cover_url`), `VideoRead`, `AudioRead`, `TagRead`, `AuthorRead`, `LevelRead`, `GenreRead`, `TokenResponse`, `Page[T]`.
+- Schemas: `BookRead` (incl. `cover_url`), `VideoRead`, `AudioRead`, `TagRead`, `AuthorRead`, `LevelRead`, `GenreRead`, `TokenResponse`, `Page[T]`, `AccountCreateResponse` (`{username, credential}`).
 - Error body: `{"detail": str}`.
 - Auth: Bearer JWT with a role claim. The `httpOnly` `access_token` cookie is accepted when a request carries no `Authorization` header (native media tags).
 - URL prefixes: `/api/`, `/media/` (internal only), `/static/covers/` (public).
-- Routes: `POST /api/auth/token` (login), `POST /api/auth/logout` (clears the cookie).
+- Routes: `POST /api/auth/token` (login), `POST /api/auth/logout` (clears the cookie), `POST /api/auth/users` (create student/teacher; 201 `{username, credential}`), `POST /api/auth/change-password` (200 `{message}`), `GET /api/setup` (200 `{message}`).
+- Request bodies: `POST /api/auth/users` takes `{username, first_name, last_name, role}`; `POST /api/auth/change-password` takes `{old_password, new_password}`.
 
 ## Repository Structure
 
