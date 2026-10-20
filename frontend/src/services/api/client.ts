@@ -16,6 +16,13 @@ function getToken(): string | null {
     }
 }
 
+export const AUTH_UNAUTHORIZED_EVENT = 'auth:unauthorized';
+
+function signalUnauthorized(): void {
+    localStorage.removeItem('auth');
+    window.dispatchEvent(new Event(AUTH_UNAUTHORIZED_EVENT));
+}
+
 export async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
     const token = getToken();
     const headers = new Headers(init.headers);
@@ -24,7 +31,7 @@ export async function apiFetch(path: string, init: RequestInit = {}): Promise<Re
     const res = await fetch(`${API_BASE}${path}`, { ...init, headers, credentials: 'include' });
 
     if (res.status === 401) {
-        localStorage.removeItem('auth');
+        signalUnauthorized();
     }
     return res;
 }

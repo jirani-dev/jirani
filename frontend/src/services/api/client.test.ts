@@ -1,8 +1,8 @@
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { login } from './auth';
-import { ApiError, apiFetch } from './client';
+import { ApiError, apiFetch, AUTH_UNAUTHORIZED_EVENT } from './client';
 
 const server = setupServer();
 
@@ -120,4 +120,23 @@ describe('apiFetch Authorization header', () => {
 
         expect(authorization).toBeNull();
     });
+});
+
+it('a 401 clears the stored session and emits one unauthorized event', async () => {
+    localStorage.setItem(
+        'auth',
+        JSON.stringify({ access_token: 'stale', username: 'u', role: 'student' }),
+    );
+    const listener = vi.fn();
+    window.addEventListener(AUTH_UNAUTHORIZED_EVENT, listener);
+    server.use(
+        http.get('*/probe', () => new HttpResponse(null, { status: 401 })),
+    );
+
+    const res = await apiFetch('/probe');
+
+    expect(res.status).toBe(401);
+    expect(localStorage.getItem('auth')).toBeNull();
+    expect(listener).toHaveBeenCalledTimes(1);
+    window.removeEventListener(AUTH_UNAUTHORIZED_EVENT, listener);
 });
