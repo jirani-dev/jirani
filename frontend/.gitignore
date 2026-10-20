@@ -34,9 +34,8 @@ Desktop.ini
 coverage
 coverage/
 
-# Generated dependency lockfile stays out of the repo (learner-team policy;
-# reinstating CI for the frontend later is the trigger to track it again)
-package-lock.json
+# Alternative package-manager lockfiles — npm's package-lock.json IS tracked
+# (the trigger named by the old policy fired: the frontend CI gate exists)
 npm-shrinkwrap.json
 bun.lock
 bun.lockb

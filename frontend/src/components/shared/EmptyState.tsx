@@ -15,7 +15,7 @@ export const EmptyState = ({ icon: Icon, label, onUpload, isAdmin }: EmptyStateP
         <div>
             <p className="text-xl font-bold text-[#1C1A17] mb-1.5">No {label} yet</p>
             <p className="text-[13px] text-[#A09890] m-0">
-                {isAdmin ? `Upload some ${label} to get started` : "Nothing here yet — check back later"}
+                {isAdmin ? `Upload some ${label} to get started` : "Nothing here yet â€” check back later"}
             </p>
         </div>
         {isAdmin && (

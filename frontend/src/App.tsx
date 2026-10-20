@@ -2,7 +2,6 @@ import { Routes, Route } from 'react-router-dom'
 import Home from './pages/Home'
 import Library from './pages/Library'
 import Book from './pages/Book'
-import Video from './pages/Video'
 import Setup from './pages/Setup'
 
 function App() {
@@ -11,7 +10,6 @@ function App() {
             <Route path="/" element={<Home />} />
             <Route path="/library" element={<Library />} />
             <Route path="/read/:uid" element={<Book />} />
-            <Route path="/video" element={<Video />} />
             <Route path="/setup" element={<Setup />} />
         </Routes>
     )

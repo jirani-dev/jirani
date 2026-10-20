@@ -30,28 +30,34 @@ export const UploadModal = ({ type, onClose, onSuccess }: UploadModalProps) => {
     const acceptType = type === 'book' ? '.pdf,.epub' : type === 'audio' ? '.mp3,.wav,.ogg,.m4a,.aac,.flac' : 'video/*';
 
     const upload = async () => {
-    if (files.length === 0) { setError('No files selected.'); return; }
-    setLoading(true); setError('');
-    try {
-        if (type === 'book') {
-            await booksApi.uploadBooks(files, { tags });
-        } else if (type === 'audio') {
-            files.length === 1
-                ? await audioApi.uploadAudio(files[0], tags)
-                : await audioApi.uploadAudioTracks(files);
-        } else {
-            files.length === 1
-                ? await videosApi.uploadVideo(files[0], tags)
-                : await videosApi.uploadVideos(files);
+        if (files.length === 0) { setError('No files selected.'); return; }
+        const [first] = files;
+        if (!first) return; // unreachable after the length guard; keeps noUncheckedIndexedAccess honest
+        setLoading(true); setError('');
+        try {
+            if (type === 'book') {
+                await booksApi.uploadBooks(files, { tags });
+            } else if (type === 'audio') {
+                if (files.length === 1) {
+                    await audioApi.uploadAudio(first, tags);
+                } else {
+                    await audioApi.uploadAudioTracks(files);
+                }
+            } else {
+                if (files.length === 1) {
+                    await videosApi.uploadVideo(first, tags);
+                } else {
+                    await videosApi.uploadVideos(files);
+                }
+            }
+            onSuccess();
+            onClose();
+        } catch (e) {
+            setError((e as Error).message || 'Upload failed.');
+        } finally {
+            setLoading(false);
         }
-        onSuccess();
-        onClose();
-    } catch (e) {
-        setError((e as Error).message || 'Upload failed.');
-    } finally {
-        setLoading(false);
-    }
-};
+    };
 
     const TabIcon = type === 'book' ? BookOpen : type === 'audio' ? Music : Film;
     const tabLabel = type === 'book' ? 'Add Book' : type === 'audio' ? 'Add Audio' : 'Add Video';

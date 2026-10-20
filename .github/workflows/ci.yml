@@ -8,9 +8,9 @@ name: ci
 
 on:
   pull_request:
-    branches: [refactor, master]
+    branches: [master]
   push:
-    branches: [refactor, master]
+    branches: [master]
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -154,6 +154,16 @@ jobs:
         if: steps.fe.outputs.changed == 'true'
         working-directory: frontend
         run: npm run lint
+
+      - name: Typecheck
+        if: steps.fe.outputs.changed == 'true'
+        working-directory: frontend
+        run: npm run typecheck
+
+      - name: Test
+        if: steps.fe.outputs.changed == 'true'
+        working-directory: frontend
+        run: npm run test
 
       - name: Build
         if: steps.fe.outputs.changed == 'true'

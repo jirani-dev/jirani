@@ -93,7 +93,7 @@ Subagents run in a child session with their own context: their tool output — a
 
 ## The one process gate: the reviewer
 
-There is no mandated workflow — work how you like. A change is done when the `review` agent passes it locally (`@review …` or `/done`) and CI is green (`quality`, `docker-build`, `ai-review`, `frontend`); the GitHub ruleset in `.github/rulesets/protected-branches.json` makes those checks a hard requirement to merge into `master` or `refactor`. What the reviewer passes is good enough.
+There is no mandated workflow — work how you like. A change is done when the `review` agent passes it locally (`@review …` or `/done`) and CI is green (`quality`, `docker-build`, `ai-review`, `frontend`); the GitHub ruleset in `.github/rulesets/protected-branches.json` makes those checks a hard requirement to merge into `master`. What the reviewer passes is good enough.
 
 ## Failure Protocol
 

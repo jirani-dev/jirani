@@ -23,7 +23,7 @@ export const PdfToolbar = ({ scale, onBack, onZoomIn, onZoomOut }: PdfToolbarPro
                 <ZoomOut size={15} />
             </button>
             <span className="text-[#888] text-xs font-mono min-w-[36px] text-center">
-                {scale ? `${Math.round(scale * 100)}%` : '—'}
+                {scale ? `${Math.round(scale * 100)}%` : 'â€”'}
             </span>
             <button onClick={onZoomIn} disabled={!scale || scale >= 3} className={btnClass}>
                 <ZoomIn size={15} />
