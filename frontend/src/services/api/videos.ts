@@ -1,5 +1,5 @@
 // src/services/api/videos.ts
-import { apiFetch, parseErrorDetail } from './client';
+import { ApiError, apiFetch } from './client';
 import { Video } from '../../types';
 import API_BASE from '../../config';
 
@@ -11,13 +11,13 @@ export function getVideoStreamUrl(id: Video['id']): string {
 
 export async function streamVideo(id: Video['id']): Promise<Blob> {
     const res = await apiFetch(`${BASE}/stream/${id}`);
-    if (!res.ok) throw new Error('Failed to stream video');
+    if (!res.ok) throw await ApiError.fromResponse(res, 'Failed to stream video');
     return res.blob();
 }
 
 export async function fetchVideos(): Promise<Video[]> {
     const res = await apiFetch(`${BASE}/`);
-    if (!res.ok) throw new Error('Failed to fetch videos');
+    if (!res.ok) throw await ApiError.fromResponse(res, 'Failed to fetch videos');
     return res.json();
 }
 
@@ -27,7 +27,7 @@ export async function uploadVideo(file: File, tags?: string): Promise<Video> {
     formData.append('title', file.name.replace(/\.[^/.]+$/, ''));
     if (tags?.trim()) formData.append('tags', tags.trim());
     const res = await apiFetch(`${BASE}/upload`, { method: 'POST', body: formData });
-    if (!res.ok) throw new Error(await parseErrorDetail(res, 'Upload failed'));
+    if (!res.ok) throw await ApiError.fromResponse(res, 'Upload failed');
     return res.json();
 }
 
@@ -35,13 +35,13 @@ export async function uploadVideos(files: File[]): Promise<Video[]> {
     const formData = new FormData();
     files.forEach(f => formData.append('files', f));
     const res = await apiFetch(`${BASE}/upload_multiple`, { method: 'POST', body: formData });
-    if (!res.ok) throw new Error(await parseErrorDetail(res, 'Upload failed'));
+    if (!res.ok) throw await ApiError.fromResponse(res, 'Upload failed');
     return res.json();
 }
 
 export async function deleteVideo(id: Video['id']): Promise<void> {
     const res = await apiFetch(`${BASE}/${id}`, { method: 'DELETE' });
-    if (!res.ok) throw new Error('Delete failed');
+    if (!res.ok) throw await ApiError.fromResponse(res, 'Delete failed');
 }
 
 export async function updateVideo(
@@ -52,6 +52,6 @@ export async function updateVideo(
     params.append('description', description);
     params.append('tags', tags);
     const res = await apiFetch(`${BASE}/${id}?${params}`, { method: 'PATCH' });
-    if (!res.ok) throw new Error(await parseErrorDetail(res, 'Update failed'));
+    if (!res.ok) throw await ApiError.fromResponse(res, 'Update failed');
     return res.json();
 }
