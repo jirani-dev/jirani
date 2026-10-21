@@ -30,7 +30,9 @@ export async function apiFetch(path: string, init: RequestInit = {}): Promise<Re
 
     const res = await fetch(`${API_BASE}${path}`, { ...init, headers, credentials: 'include' });
 
-    if (res.status === 401) {
+    // Only the session that made this request may be invalidated. A delayed
+    // 401 from an old token must not discard a successful re-login.
+    if (res.status === 401 && getToken() === token) {
         signalUnauthorized();
     }
     return res;

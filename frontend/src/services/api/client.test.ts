@@ -140,3 +140,44 @@ it('a 401 clears the stored session and emits one unauthorized event', async () 
     expect(listener).toHaveBeenCalledTimes(1);
     window.removeEventListener(AUTH_UNAUTHORIZED_EVENT, listener);
 });
+
+it('ignores a 401 from a request started with a superseded token', async () => {
+    localStorage.setItem(
+        'auth',
+        JSON.stringify({ access_token: 'old.token', username: 'u', role: 'student' }),
+    );
+    const listener = vi.fn();
+    window.addEventListener(AUTH_UNAUTHORIZED_EVENT, listener);
+
+    let release!: () => void;
+    let markStarted!: () => void;
+    const started = new Promise<void>((resolve) => {
+        markStarted = resolve;
+    });
+    server.use(
+        http.get('*/slow', async () => {
+            markStarted();
+            await new Promise<void>((resolve) => {
+                release = resolve;
+            });
+            return new HttpResponse(null, { status: 401 });
+        }),
+    );
+
+    const pending = apiFetch('/slow');
+    await started;
+
+    // The user logs in again while the old request is still in flight.
+    localStorage.setItem(
+        'auth',
+        JSON.stringify({ access_token: 'new.token', username: 'u2', role: 'admin' }),
+    );
+    release();
+    await pending;
+
+    expect(listener).not.toHaveBeenCalled();
+    expect(JSON.parse(localStorage.getItem('auth') ?? 'null')).toMatchObject({
+        access_token: 'new.token',
+    });
+    window.removeEventListener(AUTH_UNAUTHORIZED_EVENT, listener);
+});
