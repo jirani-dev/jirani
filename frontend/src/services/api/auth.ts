@@ -1,5 +1,5 @@
 // src/services/api/auth.ts
-import { apiFetch, parseErrorDetail } from './client';
+import { ApiError, apiFetch } from './client';
 import { LoginResponse, Role } from '../../types';
 
 export async function login(username: string, password: string): Promise<LoginResponse> {
@@ -8,7 +8,7 @@ export async function login(username: string, password: string): Promise<LoginRe
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),
     });
-    if (!res.ok) throw new Error(await parseErrorDetail(res, 'Invalid username or password.'));
+    if (!res.ok) throw await ApiError.fromResponse(res, 'Invalid username or password.');
     return res.json();
 }
 
@@ -25,7 +25,7 @@ export async function changePassword(oldPassword: string, newPassword: string): 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ old_password: oldPassword, new_password: newPassword }),
     });
-    if (!res.ok) throw new Error(await parseErrorDetail(res, 'Failed to change password.'));
+    if (!res.ok) throw await ApiError.fromResponse(res, 'Failed to change password.');
 }
 
 export interface CreateUserRequest {
@@ -49,7 +49,7 @@ export async function createUser(data: CreateUserRequest): Promise<CreateUserRes
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
     });
-    if (!res.ok) throw new Error(await parseErrorDetail(res, 'Failed to create account.'));
+    if (!res.ok) throw await ApiError.fromResponse(res, 'Failed to create account.');
     return res.json();
 }
 

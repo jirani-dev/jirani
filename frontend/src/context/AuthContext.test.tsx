@@ -1,4 +1,6 @@
-import { act, renderHook } from '@testing-library/react';
+import { act, render, renderHook } from '@testing-library/react';
+import { MemoryRouter, useLocation } from 'react-router-dom';
+import { AUTH_UNAUTHORIZED_EVENT } from '../services/api/client';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import type { ReactNode } from 'react';
@@ -26,7 +28,9 @@ const loginResponse: LoginResponse = {
 };
 
 const wrapper = ({ children }: { children: ReactNode }) => (
-    <AuthProvider>{children}</AuthProvider>
+    <MemoryRouter>
+        <AuthProvider>{children}</AuthProvider>
+    </MemoryRouter>
 );
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
@@ -83,5 +87,68 @@ describe('AuthContext (characterization — pins frontend/AGENTS.md §Backend In
     it('a fresh visitor is a guest', () => {
         const { result } = renderHook(() => useAuth(), { wrapper });
         expect(result.current.isGuest).toBe(true);
+    });
+
+    it('a 401 event clears auth and returns to the login route', async () => {
+        localStorage.setItem(
+            'auth',
+            JSON.stringify({ access_token: 'stale', username: 'u', role: 'student' }),
+        );
+
+        const Harness = () => {
+            const { auth } = useAuth();
+            const location = useLocation();
+            return (
+                <span data-testid="state">
+                    {location.pathname}:{auth ? 'in' : 'out'}
+                </span>
+            );
+        };
+
+        const { getByTestId } = render(
+            <MemoryRouter initialEntries={['/library']}>
+                <AuthProvider>
+                    <Harness />
+                </AuthProvider>
+            </MemoryRouter>,
+        );
+
+        act(() => {
+            window.dispatchEvent(new Event(AUTH_UNAUTHORIZED_EVENT));
+        });
+
+        expect(getByTestId('state')).toHaveTextContent('/:out');
+        expect(localStorage.getItem('auth')).toBeNull();
+    });
+
+    it('a 401 while already on / does not loop or move away', () => {
+        localStorage.setItem(
+            'auth',
+            JSON.stringify({ access_token: 'stale', username: 'u', role: 'student' }),
+        );
+
+        const Harness = () => {
+            const { auth } = useAuth();
+            const location = useLocation();
+            return (
+                <span data-testid="state">
+                    {location.pathname}:{auth ? 'in' : 'out'}
+                </span>
+            );
+        };
+
+        const { getByTestId } = render(
+            <MemoryRouter initialEntries={['/']}>
+                <AuthProvider>
+                    <Harness />
+                </AuthProvider>
+            </MemoryRouter>,
+        );
+
+        act(() => {
+            window.dispatchEvent(new Event(AUTH_UNAUTHORIZED_EVENT));
+        });
+
+        expect(getByTestId('state')).toHaveTextContent('/:out');
     });
 });

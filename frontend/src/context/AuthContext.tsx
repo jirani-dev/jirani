@@ -1,7 +1,9 @@
 // src/context/AuthContext.tsx
-import { createContext, useContext, useState, ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { useNavigate } from "react-router-dom";
 import { LoginResponse, Role } from "../types";
 import * as authApi from "../services/api/auth";
+import { AUTH_UNAUTHORIZED_EVENT } from "../services/api/client";
 
 export interface AuthData {
     access_token: string;
@@ -29,6 +31,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             return null;
         }
     });
+
+    const navigate = useNavigate();
+
+    useEffect(() => {
+        const handleUnauthorized = () => {
+            localStorage.removeItem("auth");
+            setAuth(null);
+            navigate("/", { replace: true });
+        };
+        window.addEventListener(AUTH_UNAUTHORIZED_EVENT, handleUnauthorized);
+        return () =>
+            window.removeEventListener(AUTH_UNAUTHORIZED_EVENT, handleUnauthorized);
+    }, [navigate]);
 
     const login = (data: LoginResponse) => {
         const authData: AuthData = {

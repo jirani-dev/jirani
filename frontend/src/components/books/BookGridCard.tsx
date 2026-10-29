@@ -47,10 +47,12 @@ export const BookGridCard = ({ book, isAdmin, onDelete, onEdit }: BookGridCardPr
                 {isAdmin && (
                     <div className="absolute inset-0 bg-gradient-to-t from-[rgba(28,26,23,0.65)] to-transparent to-55% opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-2.5 gap-1.5 justify-end pointer-events-none">
                         <button onClick={(e) => { e.stopPropagation(); onEdit(book); }}
+                            aria-label="Edit book"
                             className="w-[34px] h-[34px] rounded-[9px] bg-white/95 border-none cursor-pointer flex items-center justify-center text-[#6B6560] pointer-events-auto">
                             <Pencil size={14} />
                         </button>
                         <button onClick={handleDelete} disabled={deleting}
+                            aria-label="Delete book"
                             className="w-[34px] h-[34px] rounded-[9px] bg-white/95 border-none cursor-pointer flex items-center justify-center text-[#D94F3D] pointer-events-auto disabled:opacity-40">
                             {deleting ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
                         </button>
