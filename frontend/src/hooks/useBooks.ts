@@ -6,7 +6,8 @@ export function useBooks() {
     const [books, setBooks] = useState<Book[]>([]);
 
     const refresh = useCallback(async () => {
-        setBooks(await booksApi.fetchBooks());
+        const page = await booksApi.searchBooks();
+        setBooks(page.items);
     }, []);
 
     useEffect(() => { refresh(); }, [refresh]);

@@ -55,7 +55,7 @@ const UploadBook = () => {
 
     const saveEdit = async (uid: Book['uid']) => {
         try {
-            const updated = await booksApi.updateBook(uid, editTitle);
+            const updated = await booksApi.updateBook(uid, { title: editTitle });
             setBooks(prev => prev.map(b => b.uid === uid ? updated : b));
             setEditingUid(null);
         } catch {
