@@ -1,6 +1,6 @@
 import { Trash2, Loader2, Pencil, Check, X } from 'lucide-react';
 import { Video } from '../../types';
-import { getVideoStreamUrl } from '../../api/videos';
+import { getVideoStreamUrl } from '../../services/api/videos';
 
 interface VideoCardProps {
     video: Video;

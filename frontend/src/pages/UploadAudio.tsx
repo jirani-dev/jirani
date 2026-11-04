@@ -3,7 +3,7 @@ import { useAuth } from "../context/AuthContext";
 import { useAudio } from "../hooks/useAudio";
 import { AudioUploader } from "../components/audio/AudioUploader";
 import { AudioCard } from "../components/audio/AudioCard";
-import * as audioApi from "../api/audio";
+import * as audioApi from "../services/api/audio";
 import { Audio as AudioType } from "../types";
 
 type AlertType = "" | "success" | "error";
@@ -21,7 +21,7 @@ const UploadAudio = () => {
     const [editDescription, setEditDescription] = useState("");
     const [currentlyPlayingId, setCurrentlyPlayingId] = useState<AudioType["id"] | null>(null);
 
-    // Same server-side gap as video/book write routes — see /areas/jirani.md.
+    // Same server-side gap as video/book write routes ï¿½ see /areas/jirani.md.
     // Client-side gate here is defense in depth until RoleChecker lands on /audio too.
     if (!isAdmin) {
         return (
@@ -45,7 +45,7 @@ const UploadAudio = () => {
             await refresh();
             setFiles([]);
         } catch {
-            setAlert({ msg: "// upload failed — try again", type: "error" });
+            setAlert({ msg: "// upload failed ï¿½ try again", type: "error" });
         } finally {
             setLoading(false);
         }

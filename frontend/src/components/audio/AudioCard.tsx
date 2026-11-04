@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Trash2, Loader2, Pencil, Check, X, Music } from 'lucide-react';
 import { Audio } from '../../types';
-import { getAudioStreamUrl } from '../../api/audio';
+import { getAudioStreamUrl } from '../../services/api/audio';
 
 interface AudioCardProps {
     audio: Audio;

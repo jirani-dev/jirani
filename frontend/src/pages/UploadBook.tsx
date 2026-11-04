@@ -2,9 +2,9 @@ import { useState, ChangeEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useBooks } from "../hooks/useBooks";
-import { BookUploader } from "../components/book/BookUploader";
-import { BookCard } from "../components/book/BookCard";
-import * as booksApi from "../api/books";
+import { BookUploader } from "../components/books/BookUploader";
+import { BookCard } from "../components/books/BookCard";
+import * as booksApi from "../services/api/books";
 import { Book } from "../types";
 
 type AlertType = "" | "success" | "error";
@@ -35,7 +35,7 @@ const UploadBook = () => {
             await refresh();
             setFiles([]);
         } catch {
-            setAlert({ msg: "// upload failed — try again", type: "error" });
+            setAlert({ msg: "// upload failed ï¿½ try again", type: "error" });
         } finally {
             setLoading(false);
         }

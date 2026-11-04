@@ -3,7 +3,7 @@ import { useAuth } from "../context/AuthContext";
 import { useVideos } from "../hooks/useVideos";
 import { VideoUploader } from "../components/video/VideoUploader";
 import { VideoCard } from "../components/video/VideoCard";
-import * as videosApi from "../api/videos";
+import * as videosApi from "../services/api/videos";
 import { Video as VideoType } from "../types";
 
 type AlertType = "" | "success" | "error";
@@ -45,7 +45,7 @@ const UploadVideo = () => {
             await refresh();
             setFiles([]);
         } catch {
-            setAlert({ msg: "// upload failed — try again", type: "error" });
+            setAlert({ msg: "// upload failed ï¿½ try again", type: "error" });
         } finally {
             setLoading(false);
         }
