@@ -19,7 +19,7 @@ import '@fontsource/ibm-plex-mono/500.css'
 import './index.css'
 
 
-createRoot(document.getElementById('root')).render(
+createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
       <AuthProvider>

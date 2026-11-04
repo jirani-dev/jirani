@@ -47,3 +47,5 @@ docs/superpowers/
 graphify-out/
 
 backend/data/
+
+frontend/.vite/
