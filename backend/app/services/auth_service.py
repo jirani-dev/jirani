@@ -226,3 +226,22 @@ class AuthService:
         if not (account := self.auth_repo.get_by_id(user_id)):
             raise UserNotFound("User not found")
         return AccountRead.model_validate(account)
+
+
+    def deactivate_user(self, user_id: int, user_role: RoleEnum) -> AccountRead:
+        if user_role not in [RoleEnum.teacher, RoleEnum.admin]:
+            raise PermissionError("Only teachers and admins can deactivate users.")
+        if not (account := self.auth_repo.get_by_id(user_id)):
+            raise UserNotFound("User not found")
+
+        if user_role == RoleEnum.admin and account.role != RoleEnum.teacher:
+            raise PermissionError("Admins can only deactivate teacher accounts.")
+
+        if user_role == RoleEnum.teacher and account.role != RoleEnum.student:
+            raise PermissionError("Teachers can only deactivate student accounts.")
+
+        account.is_active = False
+        self.auth_repo.update_account(account)
+        return AccountRead.model_validate(account)      
+
+    
