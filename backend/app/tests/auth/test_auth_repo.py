@@ -90,6 +90,58 @@ def test_student_self_change_rejects_3_chars(db: Session) -> None:
         )
 
 
+#                                     ------mush's deactivate tests ------------
+def test_admin_can_deactivate_teacher(db: Session) -> None:
+    service = service_for(db)
+
+    account, _ = service.create_user(
+        AccountCreateRequest(
+            username="teacher",
+            role=RoleEnum.teacher,
+            first_name="Teacher",
+            last_name="User",
+        ),
+        user_role=RoleEnum.admin,
+    )
+
+    assert account.id is not None
+
+    result = service.deactivate_user(account.id, RoleEnum.admin)
+
+    assert result.is_active is False
+
+
+def test_teacher_can_deactivate_student(db: Session) -> None:
+    service = service_for(db)
+
+    account, _ = service.create_user(
+        AccountCreateRequest(
+            username="student",
+            role=RoleEnum.student,
+            first_name="Student",
+            last_name="User",
+        ),
+        user_role=RoleEnum.teacher,
+    )
+
+    assert account.id is not None
+
+    result = service.deactivate_user(account.id, RoleEnum.teacher)
+
+    assert result.is_active is False
+
+
+def test_student_cannot_deactivate_user(db: Session) -> None:
+    with pytest.raises(PermissionError):
+        service_for(db).deactivate_user(
+            999999,
+            RoleEnum.student,
+        )
+
+
+#                                     ------ end of mush's deactivate tests-----------
+
+
 # --- Repo level (AuthRepo + db fixture) ---
 
 
@@ -258,3 +310,33 @@ def test_repo_change_password_can_keep_first_login(db: Session) -> None:
 
     assert teacher.hashed_password == new_hashed_password
     assert teacher.first_login is True
+
+
+#                                     ------ mush's deactivate tests-----------
+def test_repo_update_account_persists_changes(db: Session) -> None:
+    hashed_password = service_for(db).get_password_hash("testpassword")
+
+    account = AuthRepo(db).create_account(
+        Account(
+            username="student",
+            hashed_password=hashed_password,
+            role=RoleEnum.student,
+            first_name="Student",
+            last_name="User",
+        )
+    )
+
+    assert account.id is not None
+
+    account.is_active = False
+    updated = AuthRepo(db).update_account(account)
+
+    assert updated.is_active is False
+
+    found = AuthRepo(db).get_by_id(account.id)
+
+    assert found is not None
+    assert found.is_active is False
+
+
+#         -------------------------------- end of mush's deactivate tests-----------
