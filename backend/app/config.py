@@ -50,6 +50,13 @@ class Settings(BaseSettings):
     MAX_UPLOAD_SIZE: int = 50 * 1024 * 1024  # 50MB
     MAX_COVER_SIZE: int = 5 * 1024 * 1024  # 5MB
 
+    # The OpenAPI document the frontend client is generated from. It lives in
+    # the frontend tree so the generated types and their input are reviewed
+    # together; services/openapi_snapshot.py writes it.
+    OPENAPI_SNAPSHOT: Path = (
+        BASE_DIR.parent / "frontend" / "src" / "api" / "generated" / "openapi.json"
+    )
+
     # Default credentials
     STUDENT_DEFAULT_PASSWORD: str = "student123"
     TEACHER_DEFAULT_PASSWORD: str = "teacher123"
