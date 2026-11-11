@@ -753,8 +753,7 @@ export interface components {
             access_token: string;
             /** First Login */
             first_login: boolean;
-            /** Role */
-            role: string;
+            role: components["schemas"]["RoleEnum"];
             /**
              * Token Type
              * @default bearer

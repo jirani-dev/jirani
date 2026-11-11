@@ -784,8 +784,7 @@
             "type": "boolean"
           },
           "role": {
-            "title": "Role",
-            "type": "string"
+            "$ref": "#/components/schemas/RoleEnum"
           },
           "token_type": {
             "default": "bearer",
