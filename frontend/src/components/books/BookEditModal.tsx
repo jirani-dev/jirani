@@ -14,15 +14,21 @@ interface BookEditModalProps {
 }
 
 export const BookEditModal = ({ book, onClose, onUpdate }: BookEditModalProps) => {
+    const initialTags = book.tags?.map(t => t.name).join(', ') || '';
     const [title, setTitle] = useState(book.title || '');
-    const [tags, setTags] = useState(book.tags?.map(t => t.name).join(', ') || '');
+    const [tags, setTags] = useState(initialTags);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
 
     const save = async () => {
         setSaving(true); setError('');
         try {
-            const updated = await booksApi.updateBook(book.uid, { title, tags });
+            // An empty `tags` field tells the API to remove every tag, so it is
+            // only sent when the field was actually edited.
+            const updated = await booksApi.updateBook(book.uid, {
+                title,
+                ...(tags !== initialTags ? { tags } : {}),
+            });
             onUpdate(updated);
             onClose();
         } catch (e) {

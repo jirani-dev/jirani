@@ -1,5 +1,5 @@
 // src/pages/Setup.tsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { ShieldCheck, ShieldAlert, Loader2 } from 'lucide-react';
 import * as setupApi from '../services/api/setup';
@@ -10,7 +10,14 @@ const Setup = () => {
     const [status, setStatus] = useState<Status>('loading');
     const [message, setMessage] = useState('');
 
+    // GET /setup reveals the credentials exactly once. React StrictMode runs
+    // mount effects twice in development; a second request would answer 403
+    // and replace the credentials on screen with "already complete".
+    const requested = useRef(false);
+
     useEffect(() => {
+        if (requested.current) return;
+        requested.current = true;
         setupApi.runSetup()
             .then(data => {
                 setMessage(data.message);
