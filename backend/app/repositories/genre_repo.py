@@ -19,15 +19,15 @@ class GenreRepo:
         return len(orphan_ids)
 
     def get_by_name(self, name: str) -> Genre | None:
-        # case-insensitive match, stored case returned; None when absent.
-        # Search filter semantics (Task 5): None -> WHERE false, never a create.
+        # Case-insensitive lookup that returns the row as stored and never
+        # creates one: book search turns a miss into "no results".
         return self.db.execute(
             select(Genre).where(func.lower(Genre.name) == name.strip().lower())
         ).scalar_one_or_none()
 
     def get_or_create_by_name(self, name: str) -> Genre:
-        # Write path (Task 5). Reuse by case-insensitive match with STORED case;
-        # create lowercased when absent. One query, then insert.
+        # Reuse an existing row whatever case it was stored in; a new row is
+        # stored lowercased.
         existing = self.get_by_name(name)
         if existing is not None:
             return existing

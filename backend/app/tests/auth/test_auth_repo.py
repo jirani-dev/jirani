@@ -1,6 +1,10 @@
+from datetime import UTC, datetime
+
 import pytest
+from jose import jwt
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.models.account import Account
 from app.models.role_enum import RoleEnum
 from app.repositories.auth_repo import AuthRepo
@@ -258,3 +262,132 @@ def test_repo_change_password_can_keep_first_login(db: Session) -> None:
 
     assert teacher.hashed_password == new_hashed_password
     assert teacher.first_login is True
+
+
+def test_repo_next_prefix_treats_like_wildcards_literally(db: Session) -> None:
+    # "_" matches any single character in LIKE, so the all-digit username
+    # below used to be counted for the prefix "_" (and "%" for everything).
+    hashed_password = service_for(db).get_password_hash("testpassword")
+    AuthRepo(db).create_account(
+        Account(
+            username="12345",
+            hashed_password=hashed_password,
+            role=RoleEnum.student,
+            first_name="Digits",
+            last_name="User",
+        )
+    )
+
+    assert AuthRepo(db).get_next_prefix_number("_") == 1
+    assert AuthRepo(db).get_next_prefix_number("%") == 1
+    assert AuthRepo(db).get_next_prefix_number("1") == 2346
+
+
+def test_repo_get_all_users_order_survives_an_update(db: Session) -> None:
+    hashed_password = service_for(db).get_password_hash("testpassword")
+    accounts = [
+        AuthRepo(db).create_account(
+            Account(
+                username=name,
+                hashed_password=hashed_password,
+                role=RoleEnum.student,
+                first_name=name,
+                last_name="User",
+            )
+        )
+        for name in ["first", "second"]
+    ]
+
+    # An UPDATE moves the row within the table; the listing must not follow it.
+    AuthRepo(db).change_password(accounts[0], hashed_password)
+
+    assert [u.username for u in AuthRepo(db).get_all_users()] == ["first", "second"]
+
+
+# --- Service level, rules that must hold without the router's RoleChecker ---
+
+
+def test_access_token_expiry_follows_the_setting(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "ACCESS_TOKEN_EXPIRE_MINUTES", 5)
+
+    token = AuthService.create_access_token({"sub": "amina"})
+
+    claims = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+    remaining = claims["exp"] - datetime.now(UTC).timestamp()
+    assert 280 < remaining <= 300
+
+
+def test_reset_teacher_password_by_student_raises_permission_error(
+    db: Session,
+) -> None:
+    teacher, _ = service_for(db).create_user(
+        AccountCreateRequest(
+            username="teacher",
+            role=RoleEnum.teacher,
+            first_name="Teacher",
+            last_name="User",
+        ),
+        user_role=RoleEnum.admin,
+    )
+
+    with pytest.raises(PermissionError):
+        service_for(db).reset_password(teacher.id, RoleEnum.student)
+
+
+def test_change_password_rejects_the_current_password(db: Session) -> None:
+    account, credential = service_for(db).create_user(
+        AccountCreateRequest(
+            username="student",
+            role=RoleEnum.student,
+            first_name="Student",
+            last_name="User",
+        ),
+        user_role=RoleEnum.teacher,
+    )
+
+    with pytest.raises(ValueError):
+        service_for(db).change_password("student", credential)
+
+    assert account.first_login is True
+
+
+def test_authenticate_user_rejects_an_inactive_account(db: Session) -> None:
+    account, credential = service_for(db).create_user(
+        AccountCreateRequest(
+            username="student",
+            role=RoleEnum.student,
+            first_name="Student",
+            last_name="User",
+        ),
+        user_role=RoleEnum.teacher,
+    )
+    assert service_for(db).authenticate_user("student", credential) is not None
+
+    account.is_active = False
+    db.commit()
+
+    assert service_for(db).authenticate_user("student", credential) is None
+
+
+def test_repo_next_prefix_ignores_digits_int_cannot_parse(db: Session) -> None:
+    # "²".isdigit() is True but int("²") raises; one such username used to
+    # make every later bulk create for the prefix fail.
+    hashed_password = service_for(db).get_password_hash("testpassword")
+    AuthRepo(db).create_account(
+        Account(
+            username="stu²",
+            hashed_password=hashed_password,
+            role=RoleEnum.student,
+            first_name="Odd",
+            last_name="User",
+        )
+    )
+
+    assert AuthRepo(db).get_next_prefix_number("stu") == 1
+
+
+def test_list_users_as_student_raises_permission_error(db: Session) -> None:
+    with pytest.raises(PermissionError):
+        service_for(db).get_all_users(RoleEnum.student)

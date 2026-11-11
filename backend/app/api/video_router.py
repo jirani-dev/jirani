@@ -32,7 +32,7 @@ def list_videos(
 
 
 @router.post("/upload", response_model=VideoRead)
-async def upload_video(
+def upload_video(
     file: UploadFile = File(...),
     title: str = Form(...),
     description: str | None = Form(None),
@@ -40,7 +40,7 @@ async def upload_video(
     svc: VideoService = Depends(get_video_service),
     user: Account = Depends(RoleChecker(WRITE_ROLES)),
 ) -> VideoRead:
-    data = await file.read()
+    data = file.file.read()
     tag_names = [t.strip() for t in tags.split(",") if t.strip()]
     try:
         return svc.upload(
@@ -57,12 +57,12 @@ async def upload_video(
 
 
 @router.post("/upload_multiple", response_model=list[VideoRead])
-async def upload_multiple_videos(
+def upload_multiple_videos(
     files: list[UploadFile] = File(...),
     svc: VideoService = Depends(get_video_service),
     user: Account = Depends(RoleChecker(WRITE_ROLES)),
 ) -> list[VideoRead]:
-    payloads = [(await file.read(), file.filename or "") for file in files]
+    payloads = [(file.file.read(), file.filename or "") for file in files]
     try:
         return svc.upload_multiple(payloads)
     except InvalidMediaFile as exc:

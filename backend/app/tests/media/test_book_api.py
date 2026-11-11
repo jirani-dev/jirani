@@ -20,7 +20,7 @@ from app.repositories.book_repo import BookRepo
 from app.repositories.genre_repo import GenreRepo
 from app.repositories.level_repo import LevelRepo
 from app.schemas.book_schema import BookSearchCriteria, BookUpdate
-from app.services.book_errors import BookNotFound
+from app.services.book_errors import BookAlreadyExists, BookNotFound
 from app.services.book_file_storage import BookFileStorage
 from app.services.book_service import BookService
 from app.services.content_validator import ContentValidator
@@ -408,6 +408,24 @@ def test_list_books_endpoint_authed_returns_page(
     assert body["items"][0]["uid"] == "bklist01"
 
 
+def test_book_responses_include_tags(
+    db: Session, client: TestClient, setup_paths: Path
+) -> None:
+    # The frontend builds its tag chips, edit form and tag filter from this
+    # field; BookRead used to omit it even though every query loads the tags.
+    book = _seed_book(db, uid="bktags01")
+    book.tags.append(Tag(name="math"))
+    db.commit()
+    headers = _admin_headers(client, setup_paths)
+
+    listed = client.get("/books/", headers=headers).json()["items"][0]
+    detail = client.get("/books/bktags01", headers=headers).json()
+
+    assert [tag["name"] for tag in listed["tags"]] == ["math"]
+    assert [tag["name"] for tag in detail["tags"]] == ["math"]
+    assert isinstance(detail["tags"][0]["id"], int)
+
+
 def test_list_books_unauthenticated_401(client: TestClient) -> None:
     response = client.get("/books/")
     assert response.status_code == 401
@@ -516,14 +534,51 @@ def test_put_replaces_old_cover(
     )
 
     assert response.status_code == 200, response.text
-    body = response.json()
-    assert body["cover_url"] == "/static/covers/bkcov0001.png"
-    assert not (tmp_path / "covers" / "bkcov0001.jpg").exists()
-    new_cover = tmp_path / "covers" / "bkcov0001.png"
-    assert new_cover.read_bytes() == PNG_BYTES
     db.expire_all()
     row = db.execute(select(Book).where(Book.uid == "bkcov0001")).scalar_one()
-    assert row.cover_path == "bkcov0001.png"
+    # Every upload gets its own file name (see BookFileStorage.save_cover).
+    assert row.cover_path is not None
+    assert row.cover_path.startswith("bkcov0001_")
+    assert row.cover_path.endswith(".png")
+    assert response.json()["cover_url"] == f"/static/covers/{row.cover_path}"
+    assert not (tmp_path / "covers" / "bkcov0001.jpg").exists()
+    assert (tmp_path / "covers" / row.cover_path).read_bytes() == PNG_BYTES
+
+
+def test_put_cover_twice_with_same_extension_keeps_the_new_file(
+    db: Session,
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    setup_paths: Path,
+) -> None:
+    # Regression: the second upload used to be written under the same name as
+    # the first and then deleted as "the old cover".
+    _patch_dirs(monkeypatch, tmp_path)
+    headers = _admin_headers(client, setup_paths)
+    _seed_book(db, uid="bkcov0006")
+
+    first = client.put(
+        "/books/bkcov0006",
+        files={"cover": ("one.png", io.BytesIO(PNG_BYTES), "image/png")},
+        headers=headers,
+    )
+    second = client.put(
+        "/books/bkcov0006",
+        files={"cover": ("two.png", io.BytesIO(PNG_BYTES + b"2"), "image/png")},
+        headers=headers,
+    )
+
+    assert first.status_code == 200, first.text
+    assert second.status_code == 200, second.text
+    # A new URL, so the day-long cache on /static/covers/ cannot serve the old one.
+    assert second.json()["cover_url"] != first.json()["cover_url"]
+    db.expire_all()
+    row = db.execute(select(Book).where(Book.uid == "bkcov0006")).scalar_one()
+    assert row.cover_path is not None
+    covers = list((tmp_path / "covers").iterdir())
+    assert [cover.name for cover in covers] == [row.cover_path]
+    assert covers[0].read_bytes() == PNG_BYTES + b"2"
 
 
 def test_put_rejects_executable_magic_400(
@@ -614,6 +669,207 @@ def test_put_oversized_cover_400(
     assert response.status_code == 400, response.text
     assert response.json()["detail"] == "Invalid image file"
     assert list((tmp_path / "covers").iterdir()) == []
+
+
+def _seed_tagged_book(db: Session, *, uid: str, tags: list[str]) -> Book:
+    book = _seed_book(db, uid=uid)
+    for name in tags:
+        book.tags.append(Tag(name=name))
+    db.commit()
+    return book
+
+
+def test_put_empty_tags_clears_every_tag(
+    db: Session, client: TestClient, setup_paths: Path
+) -> None:
+    # The edit form sends tags="" once the last tag is removed. FastAPI maps an
+    # empty form value to None, which used to read as "leave the tags alone".
+    headers = _admin_headers(client, setup_paths)
+    _seed_tagged_book(db, uid="bktag0001", tags=["math", "algebra"])
+
+    response = client.put("/books/bktag0001", data={"tags": ""}, headers=headers)
+
+    assert response.status_code == 200, response.text
+    db.expire_all()
+    row = db.execute(select(Book).where(Book.uid == "bktag0001")).scalar_one()
+    assert row.tags == []
+    assert db.scalars(select(Tag)).all() == []  # the orphaned tags were swept
+
+
+def test_put_without_tags_field_keeps_tags(
+    db: Session, client: TestClient, setup_paths: Path
+) -> None:
+    headers = _admin_headers(client, setup_paths)
+    _seed_tagged_book(db, uid="bktag0002", tags=["math"])
+
+    response = client.put(
+        "/books/bktag0002", data={"title": "Retitled"}, headers=headers
+    )
+
+    assert response.status_code == 200, response.text
+    db.expire_all()
+    row = db.execute(select(Book).where(Book.uid == "bktag0002")).scalar_one()
+    assert row.title == "Retitled"
+    assert [tag.name for tag in row.tags] == ["math"]
+
+
+def test_put_title_only_does_not_revalidate_existing_tags(
+    db: Session, client: TestClient, setup_paths: Path
+) -> None:
+    # "c++" is not a name TagCreate accepts (audio and video tags are not
+    # validated); a rename must not trip over a tag it does not touch.
+    headers = _admin_headers(client, setup_paths)
+    _seed_tagged_book(db, uid="bktag0003", tags=["c++"])
+
+    response = client.put(
+        "/books/bktag0003", data={"title": "Retitled"}, headers=headers
+    )
+
+    assert response.status_code == 200, response.text
+    db.expire_all()
+    row = db.execute(select(Book).where(Book.uid == "bktag0003")).scalar_one()
+    assert [tag.name for tag in row.tags] == ["c++"]
+
+
+def test_put_tag_with_underscore_does_not_match_a_similar_tag(
+    db: Session, client: TestClient, setup_paths: Path
+) -> None:
+    # "_" is a LIKE wildcard: "sci_fi" used to resolve to the existing "sci-fi".
+    headers = _admin_headers(client, setup_paths)
+    _seed_tagged_book(db, uid="bktag0004", tags=["sci-fi"])
+    _seed_book(db, uid="bktag0005")
+
+    response = client.put("/books/bktag0005", data={"tags": "sci_fi"}, headers=headers)
+
+    assert response.status_code == 200, response.text
+    db.expire_all()
+    row = db.execute(select(Book).where(Book.uid == "bktag0005")).scalar_one()
+    assert [tag.name for tag in row.tags] == ["sci_fi"]
+
+
+def test_put_overlong_title_400(
+    db: Session, client: TestClient, setup_paths: Path
+) -> None:
+    headers = _admin_headers(client, setup_paths)
+    _seed_book(db, uid="bkupd0002", title="Kept")
+
+    response = client.put(
+        "/books/bkupd0002", data={"title": "x" * 256}, headers=headers
+    )
+
+    assert response.status_code == 400, response.text
+    db.expire_all()
+    row = db.execute(select(Book).where(Book.uid == "bkupd0002")).scalar_one()
+    assert row.title == "Kept"
+
+
+def test_upload_survives_unusable_embedded_subjects(
+    db: Session,
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    setup_paths: Path,
+) -> None:
+    # The file's own "subject" metadata becomes tags. Real-world subjects are
+    # full of characters a tag may not contain, and repeat themselves; neither
+    # may fail the upload (it used to answer 400 and leave the file on disk).
+    monkeypatch.setattr(settings, "UPLOAD_DIR", tmp_path)
+    headers = _admin_headers(client, setup_paths)
+    doc = pymupdf.open()
+    doc.new_page()
+    doc.set_metadata({"subject": "Science & Technology; fiction, Fiction"})
+    data: bytes = doc.tobytes()
+    doc.close()
+
+    response = client.post(
+        "/books/upload",
+        files={"file": ("subjects.pdf", io.BytesIO(data), "application/pdf")},
+        data={"title": "Subjects"},
+        headers=headers,
+    )
+
+    assert response.status_code == 200, response.text
+    db.expire_all()
+    row = db.execute(select(Book).where(Book.title == "Subjects")).scalar_one()
+    assert [tag.name for tag in row.tags] == ["fiction"]
+
+
+def test_upload_that_fails_to_save_leaves_no_files(
+    db: Session,
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    setup_paths: Path,
+) -> None:
+    _patch_dirs(monkeypatch, tmp_path)
+    headers = _admin_headers(client, setup_paths)
+
+    def refuse(self: BookRepo, book_create: object) -> Book:
+        raise BookAlreadyExists("simulated conflict")
+
+    monkeypatch.setattr(BookRepo, "create_book", refuse)
+
+    response = client.post(
+        "/books/upload",
+        files={"file": ("real.pdf", io.BytesIO(_make_pdf()), "application/pdf")},
+        data={"title": "Real PDF"},
+        headers=headers,
+    )
+
+    assert response.status_code == 409, response.text
+    assert list((tmp_path / "books").iterdir()) == []
+    assert list((tmp_path / "covers").iterdir()) == []
+
+
+def test_delete_epub_book_removes_its_read_copy(
+    db: Session, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _patch_dirs(monkeypatch, tmp_path)
+    _seed_book(db, uid="bkdel0002", file_path="bkdel0002.epub", extension="epub")
+    _make_epub(tmp_path / "books" / "bkdel0002.epub")
+    svc = _make_svc(db)
+    read_copy, _ = svc.read_book("bkdel0002")
+    assert read_copy.is_file()
+
+    svc.delete_book("bkdel0002")
+
+    assert list((tmp_path / "books").iterdir()) == []
+
+
+def test_search_title_treats_like_wildcards_literally(db: Session) -> None:
+    _seed_book(db, uid="bk0001", title="100% Maths")
+    _seed_book(db, uid="bk0002", title="1000 Maths")
+    rows, total = BookRepo(db).search(
+        BookSearchCriteria(title="100%"), limit=10, offset=0
+    )
+    assert total == 1
+    assert [row.uid for row in rows] == ["bk0001"]
+
+
+def test_search_tags_match_stored_case_insensitively(db: Session) -> None:
+    # Tags keep the case they were first stored with (see test_tag_repo).
+    book = _seed_book(db, uid="bk0001")
+    book.tags.append(Tag(name="Math"))
+    db.commit()
+    rows, total = BookRepo(db).search(
+        BookSearchCriteria(tags=["math"]), limit=10, offset=0
+    )
+    assert total == 1
+    assert [row.uid for row in rows] == ["bk0001"]
+
+
+def test_list_books_blank_filters_are_ignored(
+    db: Session, client: TestClient, setup_paths: Path
+) -> None:
+    _seed_book(db, uid="bklist02")
+    headers = _admin_headers(client, setup_paths)
+    response = client.get(
+        "/books/",
+        params={"author": "", "level": " ", "genre": "", "language": "", "tags": " , "},
+        headers=headers,
+    )
+    assert response.status_code == 200
+    assert response.json()["total"] == 1
 
 
 def test_read_pdf_book_serves_original(

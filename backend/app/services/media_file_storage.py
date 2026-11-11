@@ -1,4 +1,4 @@
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from uuid import uuid4
 
 from app.services.media_errors import MediaNotFound
@@ -9,9 +9,14 @@ class MediaFileStorage:
         self.save_dir = save_dir
 
     def save(self, file_bytes: bytes, filename: str) -> str:
+        # `filename` is whatever the client sent. Keep only its last component
+        # (PureWindowsPath splits on both "/" and "\"): a name such as
+        # "../../x.mp4" would otherwise be written outside save_dir, and a
+        # nested one could never be streamed, because the X-Accel path is built
+        # from the bare file name.
+        name = PureWindowsPath(filename).name or "upload"
         self.save_dir.mkdir(parents=True, exist_ok=True)
-        target = self.save_dir / f"{uuid4()}_{filename}"
-        target.parent.mkdir(parents=True, exist_ok=True)
+        target = self.save_dir / f"{uuid4()}_{name}"
         target.write_bytes(file_bytes)
         return str(target)
 
