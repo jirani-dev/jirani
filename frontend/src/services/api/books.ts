@@ -1,7 +1,8 @@
 import * as pdfjsLib from 'pdfjs-dist';
-import { ApiError, apiFetch } from './client';
+import { api, formData, unwrap } from '../../api/client';
+import type { paths } from '../../api/generated/schema';
 import { pageQuery, PageRequest } from './paging';
-import { Book, Page } from '../../types';
+import { Book } from '../../types';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 
@@ -24,47 +25,52 @@ export interface BookSearchParams extends PageRequest {
     extension?: string;
 }
 
-export async function searchBooks(params: BookSearchParams = {}): Promise<Page<Book>> {
-    const query = new URLSearchParams();
-    if (params.title?.trim()) query.set('title', params.title.trim());
-    if (params.author?.trim()) query.set('author', params.author.trim());
-    if (params.level?.trim()) query.set('level', params.level.trim());
-    if (params.genre?.trim()) query.set('genre', params.genre.trim());
-    if (params.language?.trim()) query.set('language', params.language.trim());
-    if (params.extension?.trim()) query.set('extension', params.extension.trim());
-    if (params.tags && params.tags.length > 0) query.set('tags', params.tags.join(','));
+interface BookMeta {
+    title?: string;
+    author?: string;
+    level?: string;
+    genre?: string;
+    language?: string;
+    tags?: string;
+}
+
+type SearchQuery = NonNullable<paths['/books/']['get']['parameters']['query']>;
+
+const trimmed = (value?: string): string | undefined => value?.trim() || undefined;
+
+export async function searchBooks(params: BookSearchParams = {}) {
     const { limit, offset } = pageQuery(params);
-    query.set('limit', String(limit));
-    query.set('offset', String(offset));
+    const query: SearchQuery = { limit, offset };
+    for (const key of ['title', 'author', 'level', 'genre', 'language', 'extension'] as const) {
+        const value = trimmed(params[key]);
+        if (value) query[key] = value;
+    }
+    if (params.tags?.length) query.tags = params.tags.join(',');
 
-    const res = await apiFetch(`${BASE}/?${query}`);
-    if (!res.ok) throw await ApiError.fromResponse(res, 'Failed to fetch books');
-    return res.json();
+    return unwrap(api.GET('/books/', { params: { query } }), 'Failed to fetch books');
 }
 
-export async function uploadBook(
-    file: File,
-    meta: { title?: string; author?: string; level?: string; genre?: string; language?: string; tags?: string } = {},
-): Promise<Book> {
-    const formData = new FormData();
-    formData.append('file', file);
-    if (meta.title?.trim()) formData.append('title', meta.title.trim());
-    if (meta.author?.trim()) formData.append('author', meta.author.trim());
-    if (meta.level?.trim()) formData.append('level', meta.level.trim());
-    if (meta.genre?.trim()) formData.append('genre', meta.genre.trim());
-    if (meta.language?.trim()) formData.append('language', meta.language.trim());
-    if (meta.tags?.trim()) formData.append('tags', meta.tags.trim());
-
-    const res = await apiFetch(`${BASE}/upload`, { method: 'POST', body: formData });
-    if (!res.ok) throw await ApiError.fromResponse(res, 'Upload failed');
-    return res.json();
+export async function uploadBook(file: File, meta: BookMeta = {}) {
+    return unwrap(
+        api.POST('/books/upload', {
+            body: {} as never,
+            bodySerializer: () =>
+                formData({
+                    file,
+                    title: trimmed(meta.title),
+                    author: trimmed(meta.author),
+                    level: trimmed(meta.level),
+                    genre: trimmed(meta.genre),
+                    language: trimmed(meta.language),
+                    tags: trimmed(meta.tags),
+                }),
+        }),
+        'Upload failed',
+    );
 }
 
-export async function uploadBooks(
-    files: File[],
-    meta: { tags?: string } = {},
-): Promise<Book[]> {
-    const results: Book[] = [];
+export async function uploadBooks(files: File[], meta: { tags?: string } = {}) {
+    const results: Awaited<ReturnType<typeof uploadBook>>[] = [];
     for (const file of files) {
         results.push(await uploadBook(file, meta));
     }
@@ -72,24 +78,28 @@ export async function uploadBooks(
 }
 
 export async function deleteBook(uid: Book['uid']): Promise<void> {
-    const res = await apiFetch(`${BASE}/${uid}`, { method: 'DELETE' });
-    if (!res.ok) throw await ApiError.fromResponse(res, 'Delete failed');
+    await unwrap(
+        api.DELETE('/books/{book_uid}', { params: { path: { book_uid: uid } } }),
+        'Delete failed',
+    );
 }
 
-export async function updateBook(
-    uid: Book['uid'],
-    fields: { title?: string; author?: string; level?: string; genre?: string; language?: string; tags?: string; cover?: File },
-): Promise<Book> {
-    const formData = new FormData();
-    if (fields.title?.trim()) formData.append('title', fields.title.trim());
-    if (fields.author?.trim()) formData.append('author', fields.author.trim());
-    if (fields.level?.trim()) formData.append('level', fields.level.trim());
-    if (fields.genre?.trim()) formData.append('genre', fields.genre.trim());
-    if (fields.language?.trim()) formData.append('language', fields.language.trim());
-    if (fields.tags !== undefined) formData.append('tags', fields.tags.trim());
-    if (fields.cover) formData.append('cover', fields.cover);
-
-    const res = await apiFetch(`${BASE}/${uid}`, { method: 'PUT', body: formData });
-    if (!res.ok) throw await ApiError.fromResponse(res, 'Update failed');
-    return res.json();
+export async function updateBook(uid: Book['uid'], fields: BookMeta & { cover?: File }) {
+    return unwrap(
+        api.PUT('/books/{book_uid}', {
+            params: { path: { book_uid: uid } },
+            body: {} as never,
+            bodySerializer: () =>
+                formData({
+                    title: trimmed(fields.title),
+                    author: trimmed(fields.author),
+                    level: trimmed(fields.level),
+                    genre: trimmed(fields.genre),
+                    language: trimmed(fields.language),
+                    tags: fields.tags?.trim(), // '' is meaningful: clears the tags
+                    cover: fields.cover,
+                }),
+        }),
+        'Update failed',
+    );
 }

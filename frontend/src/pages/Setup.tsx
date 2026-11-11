@@ -13,7 +13,7 @@ const Setup = () => {
     useEffect(() => {
         setupApi.runSetup()
             .then(data => {
-                setMessage(data.message);
+                setMessage(data.message ?? '');
                 setStatus('success');
             })
             .catch((e: Error) => {
