@@ -1,5 +1,5 @@
 // src/services/api/audio.ts
-import { ApiError, apiFetch } from './client';
+import { api, formData, unwrap } from '../../api/client';
 import { Audio } from '../../types';
 
 const BASE = '/audio';
@@ -9,47 +9,60 @@ export function getAudioStreamUrl(id: Audio['id']): string {
 }
 
 export async function streamAudio(id: Audio['id']): Promise<Blob> {
-    const res = await apiFetch(`${BASE}/stream/${id}`);
-    if (!res.ok) throw await ApiError.fromResponse(res, 'Failed to stream audio');
-    return res.blob();
+    return unwrap(
+        api.GET('/audio/stream/{audio_id}', {
+            params: { path: { audio_id: id } },
+            parseAs: 'blob',
+        }),
+        'Failed to stream audio',
+    ) as Promise<Blob>;
 }
 
-export async function fetchAudioTracks(): Promise<Audio[]> {
-    const res = await apiFetch(`${BASE}/`);
-    if (!res.ok) throw await ApiError.fromResponse(res, 'Failed to fetch audio');
-    return res.json();
+export async function fetchAudioTracks() {
+    return unwrap(api.GET('/audio/'), 'Failed to fetch audio');
 }
 
-export async function uploadAudio(file: File, tags?: string): Promise<Audio> {
-    const formData = new FormData();
-    formData.append('file', file);
-    if (tags?.trim()) formData.append('tags', tags.trim());
-    const res = await apiFetch(`${BASE}/upload`, { method: 'POST', body: formData });
-    if (!res.ok) throw await ApiError.fromResponse(res, 'Upload failed');
-    return res.json();
+export async function uploadAudio(file: File, tags?: string) {
+    return unwrap(
+        api.POST('/audio/upload', {
+            body: {} as never,
+            bodySerializer: () => formData({ file, tags: tags?.trim() || undefined }),
+        }),
+        'Upload failed',
+    );
 }
 
-export async function uploadAudioTracks(files: File[]): Promise<Audio[]> {
-    const formData = new FormData();
-    files.forEach(f => formData.append('files', f));
-    const res = await apiFetch(`${BASE}/upload_multiple`, { method: 'POST', body: formData });
-    if (!res.ok) throw await ApiError.fromResponse(res, 'Upload failed');
-    return res.json();
+export async function uploadAudioTracks(files: File[]) {
+    return unwrap(
+        api.POST('/audio/upload_multiple', {
+            body: {} as never,
+            bodySerializer: () => {
+                const fd = new FormData();
+                files.forEach((f) => fd.append('files', f));
+                return fd;
+            },
+        }),
+        'Upload failed',
+    );
 }
 
 export async function deleteAudio(id: Audio['id']): Promise<void> {
-    const res = await apiFetch(`${BASE}/${id}`, { method: 'DELETE' });
-    if (!res.ok) throw await ApiError.fromResponse(res, 'Delete failed');
+    await unwrap(
+        api.DELETE('/audio/{audio_id}', { params: { path: { audio_id: id } } }),
+        'Delete failed',
+    );
 }
 
 export async function updateAudio(
     id: Audio['id'], title: string, description: string, tags: string = '',
-): Promise<Audio> {
-    const params = new URLSearchParams();
-    if (title.trim()) params.append('title', title.trim());
-    params.append('description', description);
-    params.append('tags', tags);
-    const res = await apiFetch(`${BASE}/${id}?${params}`, { method: 'PATCH' });
-    if (!res.ok) throw await ApiError.fromResponse(res, 'Update failed');
-    return res.json();
+) {
+    return unwrap(
+        api.PATCH('/audio/{audio_id}', {
+            params: {
+                path: { audio_id: id },
+                query: { ...(title.trim() ? { title: title.trim() } : {}), description, tags },
+            },
+        }),
+        'Update failed',
+    );
 }
