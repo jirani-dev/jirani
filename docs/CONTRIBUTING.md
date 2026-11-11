@@ -1,13 +1,13 @@
 # Contributing to Jirani
 
-All merges into `master` and `refactor` go through pull requests. The GitHub ruleset in `.github/rulesets/protected-branches.json` makes this a hard requirement: no direct pushes, no force pushes, green required checks, one approval, branch up to date with its base.
+All merges into `master` go through pull requests. The GitHub ruleset in `.github/rulesets/protected-branches.json` makes this a hard requirement: no direct pushes, no force pushes, green required checks, one approval, branch up to date with its base. (The `no-commit-to-branch` pre-commit hook also refuses local commits made directly on `master` or `refactor`.)
 
 | Check | What it runs | What it means |
 |---|---|---|
 | `quality` | the check variant of the backend Definition of Done (`backend/AGENTS.md` § Build & Test Commands) on changed Python files, full pytest on testcontainers Postgres | The backend DoD |
 | `docker-build` | Docker image build sanity | The backend still packages |
 | `ai-review` | Headless audit of your diff against the backend invariants (`backend/AGENTS.md`) and the frontend invariants (`frontend/AGENTS.md`) | New invariant violations block the merge |
-| `frontend` | the frontend Definition of Done (`frontend/AGENTS.md`) when `frontend/` changed | The SPA still installs, lints, and builds |
+| `frontend` | the frontend Definition of Done (`frontend/AGENTS.md`) when `frontend/` changed | The SPA still installs, lints, type-checks, passes its tests, and builds |
 
 Expected responses:
 
