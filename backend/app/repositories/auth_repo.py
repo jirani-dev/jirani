@@ -56,3 +56,10 @@ class AuthRepo:
             if suffix.isdigit():
                 numbers.append(int(suffix))
         return max(numbers) + 1 if numbers else 1
+
+    def update_account(
+        self, account: Account
+    ) -> Account:  # need this for my deactivate method
+        self.db_session.commit()
+        self.db_session.refresh(account)
+        return account
