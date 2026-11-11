@@ -2,8 +2,7 @@
 import { useState, useEffect, useRef, useCallback, RefObject } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
 import type { PDFDocumentProxy, RenderTask } from 'pdfjs-dist';
-import { getBookReadUrl } from '../services/api/books';
-import { apiFetch } from '../services/api/client';
+import { fetchBookFile } from '../services/api/books';
 
 // pdf.js parses documents in a web worker. The worker script ships in
 // /public, so the reader needs no network beyond the library itself.
@@ -62,13 +61,9 @@ export function usePdfViewer(
 
                 // PDF.js's getDocument(url) does its own internal fetch and
                 // never sends our Authorization header. /books/{uid}/read
-                // requires auth, so we fetch the bytes ourselves (via
-                // apiFetch) and hand PDF.js the raw data instead of a URL.
-                const res = await apiFetch(getBookReadUrl(uid ?? ''));
-                if (!res.ok) {
-                    throw new Error(`Failed to fetch book (${res.status})`);
-                }
-                const arrayBuffer = await res.arrayBuffer();
+                // requires auth, so we fetch the bytes ourselves and hand
+                // PDF.js the raw data instead of a URL.
+                const arrayBuffer = await fetchBookFile(uid ?? '');
 
                 const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
                 if (cancelled) {
