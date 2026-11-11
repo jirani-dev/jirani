@@ -105,8 +105,8 @@ There is no mandated workflow — work how you like. A change is done when the `
 The `superpowers` plugin (pinned in `.opencode/opencode.jsonc`) supplies process skills: `brainstorming`, `writing-plans`, `subagent-driven-development`, `test-driven-development`, `systematic-debugging`, `verification-before-completion`. Use them when they fit. Two rules:
 
 - **The `AGENTS.md` files outrank any skill.** Where a skill's default conflicts with a rule in them (paths, permissions, the reviewer as the gate), the `AGENTS.md` rule wins.
-- **Skill output is an artifact, not a gate.** A spec or plan a skill writes (default `docs/superpowers/`, gitignored) is a local design record; if a design must outlive the session, put it in the GitHub issue or PR that builds it. The reviewer remains the only gate.
+- **Skill output is an artifact, not a gate.** A spec or plan a skill writes (default `docs/superpowers/`, gitignored) is a local process artifact; when a plan must outlive the session, promote it to `docs/plans/` (committed, kept current). The reviewer remains the only gate.
 
 ## Docs
 
-`docs/onboarding.md` covers setup, running, workflow, and the codebase tour; `docs/CONTRIBUTING.md` covers the PR process and commit format. Nothing else lives in `docs/`: no decision logs, no debt lists, no plans. Designs go in the GitHub issue or PR that builds them; skill output stays in the gitignored `docs/superpowers/`.
+`docs/onboarding.md` covers setup, running, workflow, and the codebase tour; `docs/agent-setup.md` covers installing OpenCode, connecting model access, and example usage; `docs/CONTRIBUTING.md` covers the PR process and commit format; `docs/plans/` holds the team's committed plans, one file per initiative (`frontend-rebuild-next-steps.md`), kept current as scope changes. Skill output stays in the gitignored `docs/superpowers/`.
