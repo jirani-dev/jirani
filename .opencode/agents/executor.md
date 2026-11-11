@@ -34,7 +34,7 @@ ruff format   PASS | FAIL | NOT RUN
 ruff check    PASS | FAIL | NOT RUN
 mypy strict   PASS | FAIL | NOT RUN   [files: ...]
 pytest        PASS | FAIL | NOT RUN   [N passed, M failed]
-frontend      PASS | FAIL | NOT RUN | N/A   [npm install, lint, build]
+frontend      PASS | FAIL | NOT RUN | N/A   [npm install, lint, typecheck, test, build]
 
 DEVIATIONS FROM BRIEF
 <what you did differently and why, or "none">

@@ -54,8 +54,15 @@ export class ApiError extends Error {
         } catch {
             // Non-JSON or empty body — use the caller's fallback.
         }
-        return new ApiError(res.status, detailMessage(body) ?? fallback);
+        return new ApiError(res.status, detailMessage(body) ?? statusMessage(res.status) ?? fallback);
     }
+}
+
+// Errors answered by nginx before the API sees the request carry an HTML body,
+// so there is no `detail` to show.
+function statusMessage(status: number): string | null {
+    if (status === 413) return 'This file is larger than the server accepts.';
+    return null;
 }
 
 function detailMessage(body: unknown): string | null {

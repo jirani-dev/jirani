@@ -21,7 +21,7 @@ Breaking one requires explicit approval, and you must say which one you are brea
 
 **Pinned surface (invariant 7):**
 
-- Schemas: `BookRead` (incl. `cover_url`), `VideoRead`, `AudioRead`, `TagRead`, `AuthorRead`, `LevelRead`, `GenreRead`, `TokenResponse`, `Page[T]`, `AccountCreateResponse` (`{username, credential}`).
+- Schemas: `BookRead` (incl. `cover_url` and `tags`; its `author`, `level` and `genre` fields are on the wire as `author_name`, `level_name`, `genre_name`), `VideoRead`, `AudioRead`, `TagRead`, `AuthorRead`, `LevelRead`, `GenreRead`, `TokenResponse`, `Page[T]`, `AccountCreateResponse` (`{username, credential}`).
 - Error body: `{"detail": str}`.
 - Auth: Bearer JWT with a role claim. The `httpOnly` `access_token` cookie is accepted when a request carries no `Authorization` header (native media tags).
 - URL prefixes: `/api/`, `/media/` (internal only), `/static/covers/` (public).

@@ -56,3 +56,16 @@ def test_poster_returns_none_when_ffmpeg_fails(
     dest_dir.mkdir()
     _put_fake_ffmpeg_on_path(tmp_path, monkeypatch, "exit 1\n")
     assert VideoMetadataReader().poster(source, dest_dir) is None
+
+
+def test_poster_removes_the_partial_image_of_a_failed_run(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "source.mp4"
+    source.write_bytes(b"bytes")
+    dest_dir = tmp_path / "covers"
+    dest_dir.mkdir()
+    body = 'for last do :; done\nprintf truncated > "$last"\nexit 1\n'
+    _put_fake_ffmpeg_on_path(tmp_path, monkeypatch, body)
+    assert VideoMetadataReader().poster(source, dest_dir) is None
+    assert list(dest_dir.iterdir()) == []

@@ -5,8 +5,6 @@ import pytest
 from app.config import settings
 from app.models.audio import Audio
 from app.models.video import Video
-from app.services.audio_service import AudioService
-from app.services.video_service import VideoService
 from app.tests.conftest import auth_headers, login, setup_admin
 
 
@@ -17,13 +15,6 @@ def stream_env(client, setup_paths, monkeypatch, tmp_path):
     token = login(client, "admin", admin_pw)["access_token"]
     headers = auth_headers(token)
     return tmp_path, headers
-
-
-@pytest.fixture()
-def video_service(db) -> VideoService:
-    # Scaffold for the fused rewrite: the module does not exist yet, so this
-    # file's import is the collection-error red for Step 2.
-    return VideoService(db)
 
 
 def _seed_video(
@@ -42,6 +33,12 @@ def _seed_video(
         ("clip.mp4", "video/mp4"),
         ("clip.mov", "video/quicktime"),
         ("clip.webm", "video/webm"),
+        # Not in Python's built-in mimetypes table; must not depend on the host.
+        ("clip.mkv", "video/x-matroska"),
+        ("clip.m4v", "video/mp4"),
+        ("clip.ogv", "video/ogg"),
+        ("clip.wmv", "video/x-ms-wmv"),
+        ("clip.avi", "video/x-msvideo"),
     ],
 )
 def test_stream_x_accel_204(db, client, stream_env, name, media_type):
@@ -111,7 +108,7 @@ def test_stream_spaced_filename_quoted(db, client, stream_env):
     assert response.headers["X-Accel-Redirect"] == "/media/videos/my%20clip.mp4"
 
 
-# --- audio (Task 3): same contract, prefix /media/audio/, legacy media map ---
+# --- audio: same contract, prefix /media/audio/ ---
 
 
 @pytest.fixture()
@@ -121,13 +118,6 @@ def audio_stream_env(client, setup_paths, monkeypatch, tmp_path):
     token = login(client, "admin", admin_pw)["access_token"]
     headers = auth_headers(token)
     return tmp_path, headers
-
-
-@pytest.fixture()
-def audio_service(db) -> AudioService:
-    # Scaffold for the fused rewrite: forces the module import, so the missing
-    # service module is a collection error before Task 3 lands (video parity).
-    return AudioService(db)
 
 
 def _seed_audio(

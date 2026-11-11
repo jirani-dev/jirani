@@ -5,11 +5,12 @@ from urllib.parse import quote
 
 import pytest
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 
-import app.api.video_router as video_router_module
 from app.config import settings
 from app.models.tag import Tag
 from app.models.video import Video
+from app.repositories.video_repo import VideoRepo
 from app.tests.conftest import auth_headers, login, setup_admin
 
 
@@ -24,15 +25,11 @@ def _seed_video(
 
 
 def _patch_video_dir(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
-    # The legacy router reads VIDS_DIR at import time; the fused router reads
-    # settings.VIDEO_DIR at request time. Patch both to a tmp_path subdir so
-    # the same location is used before and after the rewrite (raising=False
-    # keeps Step 5 green once the legacy VIDS_DIR constant is gone). The subdir
-    # keeps the setup flow's .credentials files out of the file-count asserts.
+    # A subdirectory, so the setup flow's credential files (also written under
+    # tmp_path) stay out of the file-count asserts.
     video_dir = tmp_path / "vids"
     video_dir.mkdir(parents=True, exist_ok=True)
     monkeypatch.setattr(settings, "VIDEO_DIR", video_dir)
-    monkeypatch.setattr(video_router_module, "VIDS_DIR", video_dir, raising=False)
 
 
 @pytest.fixture()
@@ -424,3 +421,82 @@ def test_all_video_endpoints_require_auth(
     vid = _seed_video(db, file_path=str(tmp_path / "vids" / "clip.mp4"))
     response = getattr(client, method)(path.format(id=vid.id), **kwargs)
     assert response.status_code == 401
+
+
+def test_upload_client_path_in_filename_is_flattened(
+    db, client, monkeypatch, tmp_path, auth
+):
+    # The multipart filename is client-controlled. "../" in it used to be
+    # joined into the target path and written outside the video directory.
+    _patch_video_dir(monkeypatch, tmp_path)
+    response = client.post(
+        "/videos/upload",
+        files={"file": ("../../escape.mp4", b"bytes", "video/mp4")},
+        data={"title": "T"},
+        headers=auth,
+    )
+    assert response.status_code == 200, response.text
+    stored = [p for p in (tmp_path / "vids").iterdir()]
+    assert len(stored) == 1
+    assert re.fullmatch(r"[0-9a-f-]{36}_escape\.mp4", stored[0].name)
+    assert not (tmp_path / "escape.mp4").exists()
+    assert not (tmp_path.parent / "escape.mp4").exists()
+    stream = client.get(f"/videos/stream/{response.json()['id']}", headers=auth)
+    assert stream.status_code == 204
+    assert stream.headers["X-Accel-Redirect"] == f"/media/videos/{stored[0].name}"
+
+
+def test_delete_video_removes_its_poster(db, client, monkeypatch, tmp_path, auth):
+    _patch_video_dir(monkeypatch, tmp_path)
+    covers_dir = tmp_path / "covers"
+    covers_dir.mkdir()
+    monkeypatch.setattr(settings, "COVER_DIR", covers_dir)
+    video_file = tmp_path / "vids" / "clip.mp4"
+    video_file.write_bytes(b"bytes")
+    poster = covers_dir / "poster.jpg"
+    poster.write_bytes(b"\xff\xd8\xff")
+    vid = _seed_video(db, file_path=str(video_file))
+    vid.poster_path = poster.name
+    db.commit()
+    response = client.delete(f"/videos/{vid.id}", headers=auth)
+    assert response.status_code == 204
+    assert not video_file.exists()
+    assert not poster.exists()
+
+
+def test_upload_that_fails_to_save_leaves_no_files(
+    db, client, monkeypatch, tmp_path, auth
+):
+    _patch_video_dir(monkeypatch, tmp_path)
+
+    def refuse(self, video_create, *, tags=None, poster_path=None):
+        raise IntegrityError("INSERT", {}, Exception("simulated"))
+
+    monkeypatch.setattr(VideoRepo, "create", refuse)
+    response = client.post(
+        "/videos/upload",
+        files={"file": ("clip.mp4", b"bytes", "video/mp4")},
+        data={"title": "T", "tags": "lesson"},
+        headers=auth,
+    )
+    assert response.status_code == 400
+    assert list((tmp_path / "vids").iterdir()) == []
+    db.expire_all()
+    # The tag was created in the same transaction as the row, so it is gone too.
+    assert db.scalar(select(func.count()).select_from(Tag)) == 0
+
+
+def test_patch_blank_title_keeps_title(db, client, auth):
+    vid = _seed_video(db, title="Keep")
+    response = client.patch(f"/videos/{vid.id}", params={"title": "  "}, headers=auth)
+    assert response.status_code == 200
+    assert response.json()["title"] == "Keep"
+
+
+def test_list_order_is_stable_across_updates(db, client, auth):
+    first = _seed_video(db, title="first")
+    second = _seed_video(db, title="second")
+    # An UPDATE moves the row within the table; the listing must not follow it.
+    client.patch(f"/videos/{first.id}", params={"description": "edited"}, headers=auth)
+    listed = client.get("/videos/", headers=auth).json()
+    assert [video["id"] for video in listed] == [first.id, second.id]

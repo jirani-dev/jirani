@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { X } from 'lucide-react';
 import { Video } from '../../types';
-import { useVideoStream } from '../../hooks/useVideoStream';
+import { getVideoStreamUrl } from '../../services/api/videos';
 
 interface VideoPlayerModalProps {
     video: Video;
@@ -15,20 +15,20 @@ export const VideoPlayerModal = ({ video, onClose }: VideoPlayerModalProps) => {
         return () => window.removeEventListener('keydown', handleKey);
     }, [onClose]);
 
-    const streamUrl = useVideoStream(video.id);
-
     return (
         <div onClick={onClose} className="fixed inset-0 z-50 bg-black/[0.92] flex flex-col items-center justify-center p-5">
             <div onClick={e => e.stopPropagation()} className="w-full max-w-[960px] flex flex-col gap-3.5">
                 <div className="flex items-center justify-between">
                     <p className="text-[15px] font-medium text-[#F0EAD6] m-0">{video.title}</p>
-                    <button onClick={onClose} className="w-[34px] h-[34px] rounded-[10px] border border-white/15 bg-white/[0.08] flex items-center justify-center cursor-pointer text-[#F0EAD6]">
+                    <button onClick={onClose} aria-label="Close player"
+                        className="w-[34px] h-[34px] rounded-[10px] border border-white/15 bg-white/[0.08] flex items-center justify-center cursor-pointer text-[#F0EAD6]">
                         <X size={15} />
                     </button>
                 </div>
-                <video autoPlay controls className="w-full rounded-xl bg-black max-h-[75vh]">
-                    <source src={streamUrl ?? undefined} />
-                </video>
+                {/* src on the element itself: the browser streams with range
+                    requests and seeks without downloading the whole file. */}
+                <video autoPlay controls src={getVideoStreamUrl(video.id)} poster={video.poster_url ?? undefined}
+                    className="w-full rounded-xl bg-black max-h-[75vh]" />
                 {video.description && <p className="text-[13px] text-[#A09890] m-0">{video.description}</p>}
                 {video.tags && video.tags.length > 0 && (
                     <div className="flex flex-wrap gap-1.5">

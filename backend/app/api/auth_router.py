@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.database import get_db
 from app.dependencies.auth import RoleChecker, get_current_user
 from app.models import Account, RoleEnum
@@ -14,6 +15,7 @@ from app.schemas import (
     BulkCreateResponse,
     ChangePasswordRequest,
     LoginRequest,
+    PasswordChangeResponse,
     ResetPasswordRequest,
     TokenResponse,
 )
@@ -27,8 +29,11 @@ def get_auth_service(db: Session = Depends(get_db)) -> AuthService:
     return AuthService(AuthRepo(db))
 
 
+# The handlers below are plain `def` on purpose: bcrypt and the synchronous
+# database session block, so FastAPI must run them in its threadpool rather
+# than on the event loop, where one slow login would stall every other request.
 @router.post("/token", response_model=TokenResponse, status_code=status.HTTP_200_OK)
-async def login(
+def login(
     login_data: LoginRequest,
     response: Response,
     auth_service: AuthService = Depends(get_auth_service),
@@ -49,7 +54,7 @@ async def login(
         samesite="strict",  # SPA + API are same-site (localhost) either way —
         # strict costs nothing here and narrows the CSRF surface for when
         # state-changing endpoints start accepting cookie-only auth.
-        max_age=60 * 60 * 2,  # matches ACCESS_TOKEN_EXPIRE_MINUTES (120 min)
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,  # same as the JWT's
     )
 
     return TokenResponse(
@@ -62,12 +67,9 @@ async def login(
 
 
 @router.post("/logout", status_code=status.HTTP_200_OK)
-async def logout(response: Response) -> dict[str, str]:
+def logout(response: Response) -> dict[str, str]:
     # No auth required: logout's only job is clearing the cookie, and it
-    # must still succeed against an already-expired or already-cleared
-    # one. (Hook for the activity-tracking spec's
-    # end_active_sessions(account_id) goes here once that feature lands —
-    # it isn't implemented yet, so there's nothing to call.)
+    # must still succeed against an already-expired or already-cleared one.
     response.delete_cookie(
         key="access_token",
         httponly=True,
@@ -77,28 +79,31 @@ async def logout(response: Response) -> dict[str, str]:
     return {"message": "Logged out"}
 
 
-@router.post("/reset-password", status_code=status.HTTP_200_OK)
-async def reset_password(
+@router.post(
+    "/reset-password",
+    response_model=PasswordChangeResponse,
+    status_code=status.HTTP_200_OK,
+)
+def reset_password(
     reset_data: ResetPasswordRequest,
     auth_service: AuthService = Depends(get_auth_service),
     current_user: Account = Depends(RoleChecker([RoleEnum.teacher, RoleEnum.admin])),
-) -> dict[str, str]:
+) -> PasswordChangeResponse:
     try:
         updated, password = auth_service.reset_password(
             reset_data.account_id, current_user.role
         )
-        return {
-            "message": f"Password reset for {updated.username}",
-            "new_password": password,
-        }
     except UserNotFound as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e)) from e
+    return PasswordChangeResponse(
+        message=f"Password reset for {updated.username}", new_password=password
+    )
 
 
 @router.post("/change-password", status_code=status.HTTP_200_OK)
-async def change_password(
+def change_password(
     change_data: ChangePasswordRequest,
     auth_service: AuthService = Depends(get_auth_service),
     current_user: Account = Depends(
@@ -120,7 +125,7 @@ async def change_password(
 
 
 @router.post("/users", status_code=status.HTTP_201_CREATED)
-async def create_user(
+def create_user(
     user_data: AccountCreateRequest,
     auth_service: AuthService = Depends(get_auth_service),
     current_user: Account = Depends(RoleChecker([RoleEnum.teacher, RoleEnum.admin])),
@@ -139,14 +144,13 @@ async def create_user(
 
 
 @router.post("/users/bulk", status_code=status.HTTP_201_CREATED)
-async def bulk_create_users(
+def bulk_create_users(
     bulk_data: BulkCreateRequest,
     auth_service: AuthService = Depends(get_auth_service),
     current_user: Account = Depends(RoleChecker([RoleEnum.teacher, RoleEnum.admin])),
 ) -> BulkCreateResponse:
     try:
-        response = auth_service.bulk_create_users(bulk_data, current_user.role)
-        return response
+        return auth_service.bulk_create_users(bulk_data, current_user.role)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except PermissionError as e:
@@ -158,15 +162,18 @@ async def bulk_create_users(
 
 
 @router.get("/users", status_code=status.HTTP_200_OK)
-async def list_users(
+def list_users(
     current_user: Account = Depends(RoleChecker([RoleEnum.teacher, RoleEnum.admin])),
     auth_service: AuthService = Depends(get_auth_service),
 ) -> list[AccountRead]:
-    return auth_service.get_all_users(current_user.role)
+    try:
+        return auth_service.get_all_users(current_user.role)
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e)) from e
 
 
 @router.get("/me", status_code=status.HTTP_200_OK)
-async def get_user_by_id(
+def get_me(
     current_user: Account = Depends(get_current_user),
     auth_service: AuthService = Depends(get_auth_service),
 ) -> AccountRead:

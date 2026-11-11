@@ -11,8 +11,7 @@ import { AuthProvider, useAuth } from './AuthContext';
 let logoutHits = 0;
 
 const server = setupServer(
-    // Wildcard origin: matches both http://localhost/api/auth/logout (today's
-    // config default) and /api/auth/logout (Task 5's same-origin default).
+    // Wildcard origin: matches whatever API base the config resolves to.
     http.post('*/auth/logout', () => {
         logoutHits += 1;
         return new HttpResponse(null, { status: 200 });
@@ -42,7 +41,7 @@ afterEach(() => {
 afterAll(() => server.close());
 
 describe('AuthContext (characterization — pins frontend/AGENTS.md §Backend Integration)', () => {
-    it('login stores token, username and role from the response body', () => {
+    it('login stores token, username, role and first_login from the response body', () => {
         const { result } = renderHook(() => useAuth(), { wrapper });
 
         act(() => result.current.login(loginResponse));
@@ -51,10 +50,25 @@ describe('AuthContext (characterization — pins frontend/AGENTS.md §Backend In
             access_token: 'tok.student',
             username: 'amina',
             role: 'student',
+            first_login: false,
         });
         expect(JSON.parse(localStorage.getItem('auth') ?? 'null')).toMatchObject({
             access_token: 'tok.student',
             role: 'student',
+        });
+    });
+
+    it('markPasswordChanged clears first_login in state and in storage', () => {
+        const { result } = renderHook(() => useAuth(), { wrapper });
+        act(() => result.current.login({ ...loginResponse, first_login: true }));
+        expect(result.current.auth?.first_login).toBe(true);
+
+        act(() => result.current.markPasswordChanged());
+
+        expect(result.current.auth?.first_login).toBe(false);
+        expect(JSON.parse(localStorage.getItem('auth') ?? 'null')).toMatchObject({
+            access_token: 'tok.student',
+            first_login: false,
         });
     });
 

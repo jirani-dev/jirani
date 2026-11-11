@@ -23,3 +23,10 @@ export function pageQuery({
 
     return { limit: safeSize, offset: (safePage - 1) * safeSize };
 }
+
+// Number of pages needed to show `total` items; never less than one, so an
+// empty result is still "page 1 of 1".
+export function pageCount(total: number, size: number = DEFAULT_PAGE_SIZE): number {
+    const { limit } = pageQuery({ size });
+    return Number.isFinite(total) && total > 0 ? Math.ceil(total / limit) : 1;
+}

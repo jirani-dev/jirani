@@ -22,10 +22,7 @@ from app.database import engine
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    # Startup
-
     yield
-    # Shutdown (if needed)
     engine.dispose()
 
 
@@ -49,9 +46,9 @@ settings.COVER_DIR.mkdir(parents=True, exist_ok=True)
 settings.AUDIO_DIR.mkdir(parents=True, exist_ok=True)
 settings.VIDEO_DIR.mkdir(parents=True, exist_ok=True)
 settings.DATA_DIR.mkdir(parents=True, exist_ok=True)
-# Mount covers directory for public access (books require auth)
 
-
+# No static mount here: nginx serves covers (/static/covers/, public) and
+# protected media (/media/, X-Accel-Redirect only) straight from disk.
 app.include_router(auth_router.router)
 app.include_router(book_router.router)
 app.include_router(video_router.router)

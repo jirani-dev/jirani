@@ -9,9 +9,11 @@ export interface Book {
     title: string;
     extension: string;
     cover_url?: string | null;
-    author?: string | null;
-    level?: string | null;
-    genre?: string | null;
+    // BookRead serialises these three under its alias names: the JSON keys
+    // are author_name / level_name / genre_name, not author / level / genre.
+    author_name?: string | null;
+    level_name?: string | null;
+    genre_name?: string | null;
     language?: string | null;
     tags?: Tag[];
 }
@@ -20,6 +22,8 @@ export interface Video {
     id: number | string;
     title: string;
     description?: string | null;
+    // Still frame extracted at upload; null when the server has no ffmpeg.
+    poster_url?: string | null;
     tags?: Tag[];
 }
 

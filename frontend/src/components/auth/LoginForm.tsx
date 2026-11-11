@@ -1,4 +1,4 @@
-import { FormEvent } from 'react';
+import { FormEvent, useId } from 'react';
 import { Loader2, Eye, EyeOff } from 'lucide-react';
 
 const inputBase =
@@ -11,6 +11,8 @@ interface LoginFormProps {
     showPassword: boolean;
     loading: boolean;
     error: string;
+    // Guidance that is not a failure, e.g. how to get a forgotten password reset.
+    notice: string;
     onUsernameChange: (v: string) => void;
     onPasswordChange: (v: string) => void;
     onToggleShowPassword: () => void;
@@ -19,53 +21,59 @@ interface LoginFormProps {
 }
 
 export const LoginForm = ({
-    username, password, showPassword, loading, error,
+    username, password, showPassword, loading, error, notice,
     onUsernameChange, onPasswordChange, onToggleShowPassword,
     onSubmit, onForgotPassword,
-}: LoginFormProps) => (
-    <form onSubmit={onSubmit} className="flex flex-col gap-3">
-        <div>
-            <label className={labelStyle}>Username</label>
-            <input
-                type="text"
-                value={username}
-                onChange={e => onUsernameChange(e.target.value)}
-                placeholder="Enter username..."
-                autoComplete="username"
-                className={inputBase}
-            />
-        </div>
-        <div>
-            <label className={labelStyle}>Password</label>
-            <div className="relative">
+}: LoginFormProps) => {
+    const usernameId = useId();
+    const passwordId = useId();
+
+    return (
+        <form onSubmit={onSubmit} className="flex flex-col gap-3">
+            <div>
+                <label htmlFor={usernameId} className={labelStyle}>Username</label>
                 <input
-                    type={showPassword ? "text" : "password"}
-                    value={password}
-                    onChange={e => onPasswordChange(e.target.value)}
-                    placeholder="Enter password..."
-                    className={`${inputBase} pr-10`}
+                    id={usernameId}
+                    type="text"
+                    value={username}
+                    onChange={e => onUsernameChange(e.target.value)}
+                    placeholder="Enter username..."
+                    autoComplete="username"
+                    className={inputBase}
                 />
-                <button type="button" onClick={onToggleShowPassword}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 bg-transparent border-none cursor-pointer text-[#A09890] p-0 flex">
-                    {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
-                </button>
             </div>
-        </div>
+            <div>
+                <label htmlFor={passwordId} className={labelStyle}>Password</label>
+                <div className="relative">
+                    <input
+                        id={passwordId}
+                        type={showPassword ? "text" : "password"}
+                        value={password}
+                        onChange={e => onPasswordChange(e.target.value)}
+                        placeholder="Enter password..."
+                        autoComplete="current-password"
+                        className={`${inputBase} pr-10`}
+                    />
+                    <button type="button" onClick={onToggleShowPassword}
+                        aria-label={showPassword ? "Hide password" : "Show password"}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 bg-transparent border-none cursor-pointer text-[#A09890] p-0 flex">
+                        {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                    </button>
+                </div>
+            </div>
 
-        {error && (
-            <p className={`m-0 text-xs text-center ${error.includes("reset") || error.includes("created") ? "text-[#B8922A]" : "text-[#A09890]"}`}>
-                {error}
-            </p>
-        )}
+            {error && <p role="alert" className="m-0 text-xs text-center text-[#A09890]">{error}</p>}
+            {!error && notice && <p className="m-0 text-xs text-center text-[#B8922A]">{notice}</p>}
 
-        <button type="submit" disabled={loading}
-            className={`py-3.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 mt-1 ${loading ? "bg-[#E8E4DE] text-[#A09890] cursor-not-allowed" : "bg-[#B8922A] text-white cursor-pointer"}`}>
-            {loading ? <><Loader2 size={14} className="animate-spin" /> Signing in...</> : "Sign In as Admin"}
-        </button>
+            <button type="submit" disabled={loading}
+                className={`py-3.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 mt-1 ${loading ? "bg-[#E8E4DE] text-[#A09890] cursor-not-allowed" : "bg-[#B8922A] text-white cursor-pointer"}`}>
+                {loading ? <><Loader2 size={14} className="animate-spin" /> Signing in...</> : "Sign In"}
+            </button>
 
-        <button type="button" onClick={onForgotPassword}
-            className="bg-transparent border-none text-[#A09890] text-xs cursor-pointer text-center">
-            Forgot password?
-        </button>
-    </form>
-);
+            <button type="button" onClick={onForgotPassword}
+                className="bg-transparent border-none text-[#A09890] text-xs cursor-pointer text-center">
+                Forgot password?
+            </button>
+        </form>
+    );
+};

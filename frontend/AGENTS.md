@@ -20,7 +20,7 @@ Breaking one requires explicit approval, same as the backend invariants.
 
 ## Backend Integration
 
-- **Login:** `POST /api/auth/token` returns `TokenResponse` (`access_token`, `token_type`, `username`, `role`, `first_login`) and sets an `httpOnly`, `samesite=strict` `access_token` cookie. Read `role` from the body; don't decode the JWT.
+- **Login:** `POST /api/auth/token` returns `TokenResponse` (`access_token`, `token_type`, `username`, `role`, `first_login`) and sets an `httpOnly`, `samesite=strict` `access_token` cookie. Read `role` from the body; don't decode the JWT. While `first_login` is true the account still has its temporary password: the library asks for a new one (`POST /api/auth/change-password`) before anything else.
 - **API calls:** `apiFetch` sends `Authorization: Bearer <token>`. An invalid Bearer is never masked by a valid cookie (locked by `backend/app/tests/auth/test_auth_api.py`).
 - **Media:** covers are public (`<img src="/static/covers/...">`). Native `<video>`, `<audio>`, and `<embed>` tags can't send headers, so they rely on the cookie: point them straight at the stream and read endpoints. Cookie-only auth stays limited to streams and reads; every state-changing call goes through `apiFetch`.
 - **Logout does two things:** call `POST /api/auth/logout` (clears the cookie) and drop the stored token. Skipping either leaves streams authenticated.

@@ -1,15 +1,10 @@
-import * as pdfjsLib from 'pdfjs-dist';
 import { ApiError, apiFetch } from './client';
 import { pageQuery, PageRequest } from './paging';
 import { Book, Page } from '../../types';
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
-
 const BASE = '/books';
 
-export function getBookStreamUrl(uid: Book['uid']): string {
-    return `${BASE}/${uid}/stream`;
-}
+// A path for apiFetch (which prepends the API base), not a URL for a tag's src.
 export function getBookReadUrl(uid: Book['uid']): string {
     return `${BASE}/${uid}/read`;
 }
@@ -60,17 +55,6 @@ export async function uploadBook(
     return res.json();
 }
 
-export async function uploadBooks(
-    files: File[],
-    meta: { tags?: string } = {},
-): Promise<Book[]> {
-    const results: Book[] = [];
-    for (const file of files) {
-        results.push(await uploadBook(file, meta));
-    }
-    return results;
-}
-
 export async function deleteBook(uid: Book['uid']): Promise<void> {
     const res = await apiFetch(`${BASE}/${uid}`, { method: 'DELETE' });
     if (!res.ok) throw await ApiError.fromResponse(res, 'Delete failed');
@@ -86,6 +70,8 @@ export async function updateBook(
     if (fields.level?.trim()) formData.append('level', fields.level.trim());
     if (fields.genre?.trim()) formData.append('genre', fields.genre.trim());
     if (fields.language?.trim()) formData.append('language', fields.language.trim());
+    // Sent even when empty: an empty `tags` field removes every tag, an
+    // absent one leaves the book's tags alone.
     if (fields.tags !== undefined) formData.append('tags', fields.tags.trim());
     if (fields.cover) formData.append('cover', fields.cover);
 
