@@ -104,6 +104,12 @@ jobs:
         working-directory: backend
         run: uv run pytest
 
+      - name: OpenAPI snapshot is current
+        if: steps.docs.outputs.docs_only != 'true'
+        working-directory: backend
+        run: |
+          uv run python -m scripts.dump_openapi ../frontend/src/api/generated/openapi.json
+          git diff --exit-code ../frontend/src/api/generated/openapi.json
       - name: Coverage on changed Python files
         if: steps.py.outputs.files != '' && steps.docs.outputs.docs_only != 'true'
         working-directory: backend
@@ -148,7 +154,7 @@ jobs:
       - name: Install
         if: steps.fe.outputs.changed == 'true'
         working-directory: frontend
-        run: npm install
+        run: npm ci
 
       - name: Lint
         if: steps.fe.outputs.changed == 'true'
@@ -165,6 +171,10 @@ jobs:
         working-directory: frontend
         run: npm run test
 
+      - name: API client drift gate
+        if: steps.fe.outputs.changed == 'true'
+        working-directory: frontend
+        run: npm run generate-api && git diff --exit-code src/api/generated
       - name: Build
         if: steps.fe.outputs.changed == 'true'
         working-directory: frontend
