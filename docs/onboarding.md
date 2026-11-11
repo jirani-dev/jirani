@@ -17,7 +17,7 @@ graphify update .                                  # builds graphify-out/ (gitig
 cd frontend && npm install                         # frontend dependencies
 ```
 
-Install opencode with `npm i -g opencode-ai` (or see opencode.ai) and launch it in the repo root — it picks up `.opencode/opencode.jsonc` automatically.
+Install opencode with `npm install -g @opencode/cli` (the V2 package — the older `opencode-ai` is V1) and launch it in the repo root — it picks up `.opencode/opencode.jsonc` automatically. Full agent setup, model connection, and example usage: `docs/agent-setup.md`.
 
 Why `uv tool install` and not `uvx`: the hook script pre-commit writes records the path of the Python that installed it. Under `uvx` that is an ephemeral cache environment, and a `uv cache clean` leaves you with a dead hook.
 
