@@ -5,7 +5,7 @@ interface AuthShape {
     access_token: string;
 }
 
-function getToken(): string | null {
+export function getToken(): string | null {
     try {
         const raw = localStorage.getItem('auth');
         if (!raw) return null;
@@ -18,7 +18,7 @@ function getToken(): string | null {
 
 export const AUTH_UNAUTHORIZED_EVENT = 'auth:unauthorized';
 
-function signalUnauthorized(): void {
+export function signalUnauthorized(): void {
     localStorage.removeItem('auth');
     window.dispatchEvent(new Event(AUTH_UNAUTHORIZED_EVENT));
 }
