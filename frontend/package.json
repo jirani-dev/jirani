@@ -9,6 +9,7 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "test": "vitest run",
+    "generate-api": "cd ../backend && uv run python -m app.services.openapi_snapshot && cd ../frontend/tools/api-codegen && npm ci --no-audit --no-fund && npm run generate",
     "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json"
   },
   "dependencies": {
@@ -16,6 +17,7 @@
     "@fontsource/ibm-plex-sans": "^5.2.8",
     "@fontsource/playfair-display": "^5.2.8",
     "lucide-react": "^0.552.0",
+    "openapi-fetch": "^0.17.0",
     "pdfjs-dist": "^3.11.174",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
