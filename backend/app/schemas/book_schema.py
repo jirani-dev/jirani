@@ -4,7 +4,7 @@ from typing import Any, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
 
-from app.schemas.tag_schema import TagCreate
+from app.schemas.tag_schema import TagCreate, TagRead
 
 T = TypeVar("T")
 
@@ -34,6 +34,7 @@ class BookRead(BookBase):
     genre: str | None = Field(default=None, alias="genre_name")
     created_at: datetime
     metadata_: dict[str, Any] = Field(default_factory=dict, alias="metadata_")
+    tags: list[TagRead] = []
 
     @computed_field
     def cover_url(self) -> str | None:
