@@ -4,8 +4,8 @@
 any agent picking up after PR #58. Issue #54 is the original design record this plan grew
 from; this file is the current source of truth and is updated as scope changes.
 
-**Verified against:** `master` @ `f87578f`, 2026-11-03. Re-verify before acting — the state
-below can drift.
+**Verified against:** `master` @ `a628206` (PR #60 merged), re-verified 2026-11-11. Re-verify
+before acting — the state below can drift.
 
 Binding rules live in the root `AGENTS.md`, `frontend/AGENTS.md`, and `backend/AGENTS.md`.
 This file is the spec + orientation, not a substitute; where it conflicts with those files,
@@ -18,7 +18,7 @@ they win.
 | Fact | Value |
 |---|---|
 | Branch | `master`, clean, up to date with `origin/master` |
-| HEAD | `f87578f` — merge of PR #58 (rebuild 2/4) |
+| HEAD | `a628206` — merge of PR #60 (nginx serves the SPA build) |
 | Post-merge CI | run `40972561765`: `quality` ✓, `frontend` ✓, `docker-build` ✓ |
 | Frontend DoD | `lint` clean, `typecheck` clean, **36 tests / 11 files**, `build` ✓ (3.47 s) |
 | TanStack Query | **not installed** |
@@ -83,6 +83,11 @@ are what remain.
 >   `:5173` allow-origin serves only the documented containerless-dev override — keep or remove
 >   deliberately
 
+Already landed since this scope was written (PR #60): nginx SPA root + `try_files`
+(`nginx/nginx.conf:34-38`) and the compose volume `./frontend/dist:/srv/frontend:ro`
+(`docker-compose.yml:51`). The remaining human-applied pieces are the API-docs proxy blocks
+(`/openapi.json`, `/docs`, `/redoc`), the cache split, and optional gzip.
+
 ### 2.5 Verification contract (verbatim)
 
 > Every PR: frontend DoD green locally **with pasted output**, `review` agent pass, CI green
@@ -96,7 +101,8 @@ document is the committed team plan; the superpowers plans are the disposable wo
 
 ## 3. Next step — PR 3 of 4: media + server state
 
-**Branch:** `frontend-media-server-state`, from `master` @ `f87578f`.
+**Branch:** `frontend-media-server-state`, from an up-to-date `master` (`a628206` when this was
+written).
 
 **Dependency (already approved):**
 
@@ -233,6 +239,11 @@ export function useBookSearch(tags: string[], title: string, page = 1, size = DE
 }
 
 // New: the unfiltered tag source. `bookKeys.all` invalidation covers this key too.
+// CAVEAT: `BookRead` has no `tags` field (`backend/app/schemas/book_schema.py:30-42`), so the
+// API never returns book tags and this query yields none at runtime — the book tag dropdown is
+// empty today even for tagged books (pre-existing; `refreshBookTags()` has the same problem).
+// Do not treat this as a working tag source. Restoring it needs a separate tag source or a
+// response-contract change — out of PR 3 scope; record it as a known gap.
 export function useBookTags() {
     return useQuery({
         queryKey: bookKeys.tags,
@@ -247,7 +258,9 @@ and calls `refreshBooks/refreshVideos/refreshAudio/refreshBookTags` plus `setBoo
 `setAudioTracks` after uploads, edits, and deletes (`:220-267`).
 
 - Read query results: `const { data: booksPage, isLoading: booksLoading } = useBookSearch(...)`,
-  `const books = booksPage?.items ?? []`; same pattern for videos/audio.
+  `const books = booksPage?.items ?? []`. Videos and audio are **not** paginated:
+  `useVideos()`/`useAudio()` return `Video[]`/`Audio[]` directly — use
+  `const { data: videos = [] } = useVideos()` (same for audio), never `?.items`.
 - `loading` becomes `booksLoading || videosLoading || audioLoading` (no `useEffect` needed).
 - `bookTagsList` becomes `useMemo(() => uniqueTags(bookTagsPage?.items ?? []), [bookTagsPage])`
   fed by `useBookTags()`.
@@ -309,11 +322,11 @@ Adding the `e2e` script means extending both `frontend/AGENTS.md` DoD and the `f
 
 **Human-applied diffs (agent no-edit zone — propose complete, paste-ready diffs in chat):**
 
-- nginx `location /` → SPA root + `try_files`;
-- proxy blocks for `/openapi.json`, `/docs`, `/redoc` (today they ride the catch-all and would
-  be shadowed);
-- cache split: hashed `/assets/` immutable, `index.html` no-cache; optional gzip;
-- `docker-compose.yml` nginx volume `./frontend/dist:/srv/frontend:ro`.
+- proxy blocks for `/openapi.json`, `/docs`, `/redoc` (today they fall into the SPA fallback);
+- cache split: hashed `/assets/` immutable, `index.html` no-cache; optional gzip.
+
+Already landed in PR #60 — do not redo: nginx SPA root + `try_files` (`nginx/nginx.conf:34-38`)
+and the compose volume `./frontend/dist:/srv/frontend:ro` (`docker-compose.yml:51`).
 
 **Decide deliberately:** backend CORS (`backend/app/main.py:39-45`) — with the Vite dev proxy,
 `http://localhost:5173` serves only the documented container-less override; keep or remove and
@@ -357,7 +370,7 @@ record why.
 - [ ] Confirm `git log -1` is the expected merge commit
 - [ ] `graphify update .` (or `graphify query ...`) before code reading
 - [ ] Read root `AGENTS.md`, `frontend/AGENTS.md`, and §2 of this file
-- [ ] `npm install @tanstack/react-query@^5` (approved; asks for confirmation)
+- [ ] `(cd frontend && npm install @tanstack/react-query@^5)` (approved; asks for confirmation)
 - [ ] Create branch `frontend-media-server-state`
 - [ ] Write PR 3 plan in `docs/superpowers/plans/` with `superpowers:writing-plans`
 - [ ] Execute tasks 1–3 test-first, one commit per task
