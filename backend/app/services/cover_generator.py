@@ -12,6 +12,9 @@ logger = logging.getLogger(__name__)
 
 _IMG_SRC_RE = re.compile(rb'<img[^>]+src=["\']([^"\']+)["\']', re.IGNORECASE)
 
+# Covers are shown as grid thumbnails; anything wider is wasted bytes.
+_MAX_COVER_WIDTH = 600
+
 
 def _local_name(tag: str) -> str:
     return tag.rpartition("}")[2].lower()
@@ -33,14 +36,13 @@ class CoverGenerator:
             return False
 
     def _from_pdf(self, source_path: Path, dest_dir: Path) -> bool:
-        doc = pymupdf.open(str(source_path))  # type: ignore[no-untyped-call]
-        page = doc.load_page(0)  # type: ignore[no-untyped-call]
-        pix = page.get_pixmap(
-            matrix=pymupdf.Matrix(0.5, 0.5)  # type: ignore[no-untyped-call]
-        )
         dest_file = dest_dir / f"{source_path.stem}.png"
-        pix.save(str(dest_file))
-        doc.close()  # type: ignore[no-untyped-call]
+        with pymupdf.open(str(source_path)) as doc:  # type: ignore[no-untyped-call]
+            page = doc.load_page(0)
+            pix = page.get_pixmap(
+                matrix=pymupdf.Matrix(0.5, 0.5)  # type: ignore[no-untyped-call]
+            )
+            pix.save(str(dest_file))
         return self._keep_if_small_enough(dest_file)
 
     def _from_epub(self, source_path: Path, dest_dir: Path) -> bool:
@@ -112,10 +114,27 @@ class CoverGenerator:
 
         if cover_bytes:
             dest_file = dest_dir / f"{source_path.stem}.png"
-            dest_file.write_bytes(cover_bytes)
+            self._write_png(cover_bytes, dest_file)
             return self._keep_if_small_enough(dest_file)
 
         return False
+
+    def _write_png(self, image_bytes: bytes, dest_file: Path) -> None:
+        """Re-encode an embedded cover as the PNG its file name promises.
+
+        EPUB covers are mostly JPEGs of arbitrary size. Decoding also rejects
+        files that are not raster images at all (an SVG cover, for instance).
+        """
+        pix = pymupdf.Pixmap(image_bytes)  # type: ignore[no-untyped-call]
+        if pix.colorspace is not None and pix.colorspace.n > 3:
+            # CMYK: PNG cannot store it.
+            pix = pymupdf.Pixmap(pymupdf.csRGB, pix)  # type: ignore[no-untyped-call]
+        if pix.width > _MAX_COVER_WIDTH:
+            height = max(1, round(pix.height * _MAX_COVER_WIDTH / pix.width))
+            pix = pymupdf.Pixmap(  # type: ignore[no-untyped-call]
+                pix, _MAX_COVER_WIDTH, height
+            )
+        pix.save(str(dest_file))  # type: ignore[no-untyped-call]
 
     def _keep_if_small_enough(self, dest_file: Path) -> bool:
         if dest_file.stat().st_size > settings.MAX_COVER_SIZE:

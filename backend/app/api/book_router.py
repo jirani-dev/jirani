@@ -7,6 +7,7 @@ from fastapi import (
     Form,
     HTTPException,
     Query,
+    Request,
     Response,
     UploadFile,
 )
@@ -51,8 +52,27 @@ def get_book_service(db: Session = Depends(get_db)) -> BookService:
     )
 
 
+async def _submitted_form_fields(request: Request) -> frozenset[str]:
+    """Names of the form fields the client actually sent.
+
+    FastAPI passes an empty form value to the handler as the parameter
+    default, so `tags=""` ("remove every tag") is indistinguishable from an
+    omitted field there. The raw form is the only place the difference
+    survives.
+    """
+    form = await request.form()
+    return frozenset(form.keys())
+
+
+def _blank_to_none(value: str | None) -> str | None:
+    """A blank query value means "no filter", not "match the empty string"."""
+    if value is None or not value.strip():
+        return None
+    return value.strip()
+
+
 @router.post("/upload", response_model=BookRead)
-async def upload_book(
+def upload_book(
     file: UploadFile = File(...),
     title: str | None = Form(None),
     author: str | None = Form(None),
@@ -76,7 +96,7 @@ async def upload_book(
             tags=tag_list,
         )
 
-        data = await file.read()
+        data = file.file.read()
         book_read = svc.create_from_upload(
             metadata, file.filename or "", data, file.content_type or ""
         )
@@ -107,15 +127,15 @@ def list_books(
         RoleChecker([RoleEnum.admin, RoleEnum.teacher, RoleEnum.student])
     ),
 ) -> Page[BookRead]:
-    tag_list = [t.strip() for t in tags.split(",")] if tags else None
+    tag_list = [t.strip() for t in (tags or "").split(",") if t.strip()]
     criteria = BookSearchCriteria(
-        title=title,
-        author=author,
-        level=level,
-        genre=genre,
-        language=language,
-        tags=tag_list,
-        extension=extension,
+        title=_blank_to_none(title),
+        author=_blank_to_none(author),
+        level=_blank_to_none(level),
+        genre=_blank_to_none(genre),
+        language=_blank_to_none(language),
+        tags=tag_list or None,
+        extension=_blank_to_none(extension),
     )
     return svc.search(criteria, limit=limit, offset=offset)
 
@@ -179,7 +199,7 @@ def get_book_details(
 
 
 @router.put("/{book_uid}", response_model=BookRead)
-async def update_book(
+def update_book(
     book_uid: str,
     title: str | None = Form(None),
     author: str | None = Form(None),
@@ -188,13 +208,15 @@ async def update_book(
     language: str | None = Form(None),
     tags: str | None = Form(None),
     cover: UploadFile | None = File(None),
+    submitted: frozenset[str] = Depends(_submitted_form_fields),
     svc: BookService = Depends(get_book_service),
     user: Account = Depends(RoleChecker([RoleEnum.admin, RoleEnum.teacher])),
 ) -> BookRead:
     try:
+        # Present-but-empty clears the tags; absent leaves them untouched.
         tag_list = (
-            [TagCreate(name=t.strip()) for t in tags.split(",") if t.strip()]
-            if tags
+            [TagCreate(name=t.strip()) for t in (tags or "").split(",") if t.strip()]
+            if "tags" in submitted
             else None
         )
         metadata = BookUpdate(
@@ -205,7 +227,7 @@ async def update_book(
             language=language,
             tags=tag_list,
         )
-        cover_bytes = await cover.read() if cover is not None else None
+        cover_bytes = cover.file.read() if cover is not None else None
         return svc.update_book(
             book_uid,
             metadata,

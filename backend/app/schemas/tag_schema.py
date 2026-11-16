@@ -18,18 +18,10 @@ class TagCreate(TagBase):
     @field_validator("name")
     @classmethod
     def validate_name(cls, v: str) -> str:
-        """Validate tag name"""
-        if not v or not v.strip():
-            raise ValueError("Tag name cannot be empty or whitespace only")
-
-        # Remove extra whitespace
+        # Runs after the strip and length checks above, so v is never blank.
         v = " ".join(v.split())
 
-        # Check length after stripping
-        if len(v) < 1 or len(v) > 50:
-            raise ValueError("Tag name must be between 1 and 50 characters")
-
-        # Invalid characters: letters, numbers, spaces, hyphens, underscores
+        # Allowed characters: letters, numbers, spaces, hyphens, underscores
         if not re.match(r"^[\w\s-]+$", v):
             raise ValueError(
                 "Tag name can only contain letters, numbers, "

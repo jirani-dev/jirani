@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Tag, Check, X } from 'lucide-react';
 import { Tag as TagType } from '../../types';
 

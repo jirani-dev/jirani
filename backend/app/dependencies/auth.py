@@ -19,7 +19,9 @@ from app.repositories import AuthRepo
 security = HTTPBearer(auto_error=False)
 
 
-async def get_current_user(
+# Plain `def`: the account lookup below is a blocking query, so FastAPI must
+# run this in its threadpool instead of on the event loop.
+def get_current_user(
     request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(security),
     db: Session = Depends(get_db),
@@ -49,7 +51,7 @@ async def get_current_user(
 
     user = AuthRepo(db).get_by_username(username)
 
-    if user is None:
+    if user is None or not user.is_active:
         raise credentials_exception
     return user
 

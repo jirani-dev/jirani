@@ -1,17 +1,14 @@
 // src/services/api/audio.ts
 import { ApiError, apiFetch } from './client';
 import { Audio } from '../../types';
+import API_BASE from '../../config';
 
 const BASE = '/audio';
 
+// For a native <audio src>: the browser streams it with range requests and
+// authenticates with the httpOnly cookie, so no token (or apiFetch) is involved.
 export function getAudioStreamUrl(id: Audio['id']): string {
-    return `${BASE}/stream/${id}`;
-}
-
-export async function streamAudio(id: Audio['id']): Promise<Blob> {
-    const res = await apiFetch(`${BASE}/stream/${id}`);
-    if (!res.ok) throw await ApiError.fromResponse(res, 'Failed to stream audio');
-    return res.blob();
+    return `${API_BASE}${BASE}/stream/${id}`;
 }
 
 export async function fetchAudioTracks(): Promise<Audio[]> {
@@ -25,14 +22,6 @@ export async function uploadAudio(file: File, tags?: string): Promise<Audio> {
     formData.append('file', file);
     if (tags?.trim()) formData.append('tags', tags.trim());
     const res = await apiFetch(`${BASE}/upload`, { method: 'POST', body: formData });
-    if (!res.ok) throw await ApiError.fromResponse(res, 'Upload failed');
-    return res.json();
-}
-
-export async function uploadAudioTracks(files: File[]): Promise<Audio[]> {
-    const formData = new FormData();
-    files.forEach(f => formData.append('files', f));
-    const res = await apiFetch(`${BASE}/upload_multiple`, { method: 'POST', body: formData });
     if (!res.ok) throw await ApiError.fromResponse(res, 'Upload failed');
     return res.json();
 }

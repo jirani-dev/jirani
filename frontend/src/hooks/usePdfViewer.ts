@@ -5,6 +5,10 @@ import type { PDFDocumentProxy, RenderTask } from 'pdfjs-dist';
 import { getBookReadUrl } from '../services/api/books';
 import { apiFetch } from '../services/api/client';
 
+// pdf.js parses documents in a web worker. The worker script ships in
+// /public, so the reader needs no network beyond the library itself.
+pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
+
 interface UsePdfViewerResult {
     loading: boolean;
     error: string | null;
@@ -67,7 +71,10 @@ export function usePdfViewer(
                 const arrayBuffer = await res.arrayBuffer();
 
                 const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-                if (cancelled) return;
+                if (cancelled) {
+                    void pdf.destroy();
+                    return;
+                }
                 pdfRef.current = pdf;
                 setTotalPages(pdf.numPages);
                 setCurrentPage(1);
@@ -82,15 +89,28 @@ export function usePdfViewer(
         };
 
         load();
-        return () => { cancelled = true; };
+        return () => {
+            cancelled = true;
+            // Leaving the book: release the parsed document. pdf.js keeps it
+            // (and its worker-side copy) alive until destroy() is called.
+            renderTaskRef.current?.cancel();
+            renderTaskRef.current = null;
+            void pdfRef.current?.destroy();
+            pdfRef.current = null;
+        };
     }, [uid, computeFitScale]);
 
     // Recompute scale on resize / orientation change
     useEffect(() => {
         const handleResize = async () => {
-            if (!pdfRef.current) return;
-            const fitScale = await computeFitScale(pdfRef.current, currentPage);
-            setScale(fitScale);
+            const pdf = pdfRef.current;
+            if (!pdf) return;
+            try {
+                const fitScale = await computeFitScale(pdf, currentPage);
+                if (pdfRef.current === pdf) setScale(fitScale);
+            } catch {
+                // The document was closed while measuring; nothing to rescale.
+            }
         };
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
@@ -98,7 +118,11 @@ export function usePdfViewer(
 
     // Render the current page whenever page/scale changes
     useEffect(() => {
-        if (!pdfRef.current || loading || scale === null) return;
+        const pdf = pdfRef.current;
+        if (!pdf || loading || scale === null) return;
+        // Set by the cleanup when a newer render (or an unmount) supersedes
+        // this one, so a late result cannot overwrite the newer render's state.
+        let superseded = false;
 
         const render = async () => {
             if (renderTaskRef.current) {
@@ -107,7 +131,8 @@ export function usePdfViewer(
             }
             setRendering(true);
             try {
-                const page = await pdfRef.current!.getPage(currentPage);
+                const page = await pdf.getPage(currentPage);
+                if (superseded) return;
                 const viewport = page.getViewport({ scale });
                 const canvas = canvasRef.current;
                 if (!canvas) return;
@@ -120,16 +145,19 @@ export function usePdfViewer(
                 await task.promise;
             } catch (e) {
                 const err = e as { name?: string; message?: string };
-                if (err?.name !== 'RenderingCancelledException') {
+                if (!superseded && err?.name !== 'RenderingCancelledException') {
                     setError(`Failed to render page: ${err?.message || err?.name || 'Unknown error'}`);
                 }
             } finally {
-                renderTaskRef.current = null;
-                setRendering(false);
+                if (!superseded) {
+                    renderTaskRef.current = null;
+                    setRendering(false);
+                }
             }
         };
 
         render();
+        return () => { superseded = true; };
     }, [currentPage, scale, loading, canvasRef]);
 
     const goTo = useCallback((n: number) => {

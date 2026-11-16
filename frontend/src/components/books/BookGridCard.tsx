@@ -6,12 +6,13 @@ import * as booksApi from '../../services/api/books';
 
 interface BookGridCardProps {
     book: Book;
-    isAdmin: boolean;
+    canManage: boolean;
     onDelete: (uid: Book['uid']) => void;
     onEdit: (book: Book) => void;
+    onError: (message: string) => void;
 }
 
-export const BookGridCard = ({ book, isAdmin, onDelete, onEdit }: BookGridCardProps) => {
+export const BookGridCard = ({ book, canManage, onDelete, onEdit, onError }: BookGridCardProps) => {
     const [deleting, setDeleting] = useState(false);
     const navigate = useNavigate();
 
@@ -21,6 +22,8 @@ export const BookGridCard = ({ book, isAdmin, onDelete, onEdit }: BookGridCardPr
         try {
             await booksApi.deleteBook(book.uid);
             onDelete(book.uid);
+        } catch (err) {
+            onError((err as Error).message || 'Delete failed');
         } finally {
             setDeleting(false);
         }
@@ -44,7 +47,7 @@ export const BookGridCard = ({ book, isAdmin, onDelete, onEdit }: BookGridCardPr
                     </span>
                 </div>
                 <div onClick={() => navigate(`/read/${book.uid}`)} className="absolute inset-0 cursor-pointer" />
-                {isAdmin && (
+                {canManage && (
                     <div className="absolute inset-0 bg-gradient-to-t from-[rgba(28,26,23,0.65)] to-transparent to-55% opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-2.5 gap-1.5 justify-end pointer-events-none">
                         <button onClick={(e) => { e.stopPropagation(); onEdit(book); }}
                             aria-label="Edit book"

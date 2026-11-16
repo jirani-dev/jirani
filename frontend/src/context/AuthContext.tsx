@@ -9,12 +9,16 @@ export interface AuthData {
     access_token: string;
     username: string;
     role: Role;
+    // True while the account still has the temporary password it was created
+    // (or reset) with; the library asks for a new one before anything else.
+    first_login: boolean;
 }
 
 interface AuthContextType {
     auth: AuthData | null;
     login: (data: LoginResponse) => void;
     logout: () => void;
+    markPasswordChanged: () => void;
     isAdmin: boolean;
     isTeacher: boolean;
     isGuest: boolean;
@@ -45,14 +49,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             window.removeEventListener(AUTH_UNAUTHORIZED_EVENT, handleUnauthorized);
     }, [navigate]);
 
+    const store = (authData: AuthData) => {
+        localStorage.setItem("auth", JSON.stringify(authData));
+        setAuth(authData);
+    };
+
     const login = (data: LoginResponse) => {
-        const authData: AuthData = {
+        store({
             access_token: data.access_token,
             username: data.username,
             role: data.role,
-        };
-        localStorage.setItem("auth", JSON.stringify(authData));
-        setAuth(authData);
+            first_login: data.first_login,
+        });
+    };
+
+    const markPasswordChanged = () => {
+        if (auth) store({ ...auth, first_login: false });
     };
 
     const logout = () => {
@@ -70,7 +82,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const isGuest = !auth;
 
     return (
-        <AuthContext.Provider value={{ auth, login, logout, isAdmin, isTeacher, isGuest }}>
+        <AuthContext.Provider
+            value={{ auth, login, logout, markPasswordChanged, isAdmin, isTeacher, isGuest }}
+        >
             {children}
         </AuthContext.Provider>
     );

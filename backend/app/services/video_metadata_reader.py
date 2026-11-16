@@ -24,11 +24,16 @@ class VideoMetadataReader:
                     "scale=480:-2",
                     str(dest),
                 ],
+                # ffmpeg reads commands from stdin unless told otherwise.
+                stdin=subprocess.DEVNULL,
                 capture_output=True,
                 timeout=30,
             )
         except (OSError, subprocess.TimeoutExpired):
+            dest.unlink(missing_ok=True)
             return None
         if result.returncode != 0 or not dest.is_file():
+            # A failed run can still leave a truncated image behind.
+            dest.unlink(missing_ok=True)
             return None
         return name

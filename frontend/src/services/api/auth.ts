@@ -53,5 +53,6 @@ export async function createUser(data: CreateUserRequest): Promise<CreateUserRes
     return res.json();
 }
 
-// No backend route for OTP/forgot-password or self-signup. First-admin
-// bootstrap happens once via GET /setup (server-side, not from this UI).
+// There is no self-service password recovery or sign-up: a forgotten password
+// is reset by a teacher or admin (POST /auth/reset-password), and the first
+// admin is created once through GET /setup (see ./setup.ts).

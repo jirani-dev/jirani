@@ -29,9 +29,11 @@ jobs:
         with:
           python-version: "3.13"
 
+      # --locked: fail if uv.lock no longer matches pyproject.toml instead of
+      # quietly re-resolving and testing a dependency set nobody committed.
       - name: Sync dependencies
         working-directory: backend
-        run: uv sync
+        run: uv sync --locked
 
       - name: Resolve changed Python files
         id: py
@@ -108,10 +110,17 @@ jobs:
         if: steps.py.outputs.files != '' && steps.docs.outputs.docs_only != 'true'
         working-directory: backend
         run: |
+          # steps.py lists paths relative to backend/ (git diff --relative), which
+          # is also where coverage runs, so they are usable as-is. Migrations are
+          # left out: the suite builds its schema from the models and never
+          # imports them, and a report restricted to files without data fails
+          # with "No data to report".
+          include=$(printf '%s\n' ${{ steps.py.outputs.files }} | grep -v '^migrations/' | paste -sd, - || true)
+          if [ -z "$include" ]; then
+            echo "Only migrations changed — nothing to measure"
+            exit 0
+          fi
           uv run coverage run --branch -m pytest -q
-          # git diff lists paths relative to repo root (e.g. backend/app/...); coverage
-          # runs from working-directory backend/ and matches patterns relative to it.
-          include=$(echo "${{ steps.py.outputs.files }}" | tr ' ' ',' | sed 's|^backend/||g')
           uv run coverage report --include="$include" --fail-under=80 --show-missing
 
   frontend:

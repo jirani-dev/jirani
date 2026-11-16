@@ -11,6 +11,9 @@ engine = create_engine(
     pool_pre_ping=True,  # Verify connections before use
     pool_recycle=300,  # Recycle connections every 5 minutes
     echo=settings.DEBUG,  # Log SQL queries in debug mode
+    # ...but never their bound values, which include password hashes. This
+    # also keeps them out of the text of database error messages.
+    hide_parameters=True,
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

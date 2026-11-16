@@ -8,8 +8,8 @@ from .tag_repo import TagRepo
 from .video_repo import VideoRepo
 
 __all__ = [
-    "AuthRepo",
     "AudioRepo",
+    "AuthRepo",
     "AuthorRepo",
     "BookRepo",
     "GenreRepo",

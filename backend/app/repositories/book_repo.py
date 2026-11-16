@@ -8,7 +8,8 @@ from app.repositories.genre_repo import GenreRepo
 from app.repositories.level_repo import LevelRepo
 from app.repositories.tag_repo import TagRepo
 from app.schemas.book_schema import BookCreate, BookSearchCriteria
-from app.services.book_errors import BookNotFound
+from app.schemas.tag_schema import TagCreate
+from app.services.book_errors import BookAlreadyExists, BookNotFound
 
 
 class BookRepo:
@@ -29,37 +30,19 @@ class BookRepo:
         return self.db_session.execute(stmt).scalar_one_or_none()
 
     def create_book(self, book_create: BookCreate) -> Book:
-        tag_data = book_create.tags
-        book_dict = book_create.model_dump(exclude={"tags"})
+        if self.get_book_by_uid(book_create.uid):
+            raise BookAlreadyExists(f"Book with UID {book_create.uid} already exists")
 
-        existing = self.get_book_by_uid(book_create.uid)
-        if existing:
-            raise ValueError(f"Book with UID {book_create.uid} already exists")
-
-        new_book = Book(**book_dict)
-
-        if tag_data:
-            for tag_in in tag_data:
-                tag = self.db_session.scalar(
-                    select(Tag).where(Tag.name.ilike(tag_in.name))
-                )
-                if not tag:
-                    tag = Tag(name=tag_in.name.strip().lower())
-                new_book.tags.append(tag)
-
+        new_book = Book(**book_create.model_dump(exclude={"tags"}))
         try:
+            new_book.tags = self._resolve_tags(book_create.tags)
             self.db_session.add(new_book)
             self.db_session.commit()
-            self.db_session.refresh(new_book)
-            return new_book
         except IntegrityError:
             self.db_session.rollback()
             raise
-
-    def get_all_books(self) -> list[Book]:
-        return list(
-            self.db_session.scalars(select(Book).options(selectinload(Book.tags))).all()
-        )
+        self.db_session.refresh(new_book)
+        return new_book
 
     def cleanup_orphan_tags(self) -> None:
         try:
@@ -82,35 +65,35 @@ class BookRepo:
             self.db_session.rollback()
             raise
 
-    def update_book(self, book_uid: str, book_update: BookCreate) -> Book:
+    def update_book(
+        self, book_uid: str, book_update: BookCreate, *, replace_tags: bool = True
+    ) -> Book:
+        """Overwrite the book's columns; its tags only when replace_tags is set."""
         book = self.get_book_by_uid(book_uid)
         if not book:
             raise BookNotFound(f"Book with UID {book_uid} does not exist")
 
-        tag_data = book_update.tags
-        book_dict = book_update.model_dump(exclude={"tags", "cover_url"})
-
-        for key, value in book_dict.items():
-            setattr(book, key, value)
-
-        if tag_data is not None:
-            book.tags.clear()
-            for tag_in in tag_data:
-                tag = self.db_session.scalar(
-                    select(Tag).where(Tag.name.ilike(tag_in.name))
-                )
-                if not tag:
-                    tag = Tag(name=tag_in.name.strip().lower())
-                book.tags.append(tag)
-
         try:
+            # Resolve tags before touching the book: the lookup may flush.
+            tags = self._resolve_tags(book_update.tags) if replace_tags else None
+            for key, value in book_update.model_dump(exclude={"tags"}).items():
+                setattr(book, key, value)
+            if tags is not None:
+                book.tags = tags
             self.db_session.commit()
-            self.db_session.refresh(book)
-            self.cleanup_orphan_tags()
-            return book
         except IntegrityError:
             self.db_session.rollback()
             raise
+        self.db_session.refresh(book)
+        if replace_tags:
+            self.cleanup_orphan_tags()
+        return book
+
+    def set_cover(self, book: Book, cover_path: str) -> Book:
+        book.cover_path = cover_path
+        self.db_session.commit()
+        self.db_session.refresh(book)
+        return book
 
     def search(
         self, criteria: BookSearchCriteria, *, limit: int, offset: int
@@ -123,14 +106,16 @@ class BookRepo:
         )
 
         if criteria.title is not None:
-            stmt = stmt.where(Book.title.ilike(f"%{criteria.title}%"))
+            # autoescape: "%" and "_" typed into the search box are literals.
+            stmt = stmt.where(Book.title.icontains(criteria.title, autoescape=True))
         if criteria.language is not None:
             stmt = stmt.where(Book.language == criteria.language)
         if criteria.extension is not None:
             stmt = stmt.where(Book.extension == criteria.extension)
         if criteria.tags:
+            # Stored names keep the case they were first created with.
             names = [t.lower() for t in criteria.tags]
-            stmt = stmt.where(Book.tags.any(Tag.name.in_(names)))
+            stmt = stmt.where(Book.tags.any(func.lower(Tag.name).in_(names)))
         if criteria.metadata_:
             stmt = stmt.where(Book.metadata_.contains(criteria.metadata_))
 
@@ -154,3 +139,10 @@ class BookRepo:
         )
         books = list(self.db_session.execute(stmt).scalars().all())
         return books, total
+
+    def _resolve_tags(self, tags: list[TagCreate]) -> list[Tag]:
+        # Stays in the caller's transaction (commit=False), so a failed book
+        # write does not leave freshly created tags behind.
+        return TagRepo(self.db_session).get_or_create_by_names(
+            [tag.name for tag in tags], commit=False
+        )

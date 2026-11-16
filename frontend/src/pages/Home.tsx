@@ -15,11 +15,12 @@ const Home = () => {
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
+    const [notice, setNotice] = useState("");
 
     const handleLogin = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         if (!username.trim() || !password.trim()) { setError("Please enter username and password."); return; }
-        setLoading(true); setError("");
+        setLoading(true); setError(""); setNotice("");
         try {
             const data = await authApi.login(username.trim(), password);
             loginToContext(data);
@@ -27,6 +28,13 @@ const Home = () => {
         } catch (e) {
             setError((e as Error).message || "Login failed.");
         } finally { setLoading(false); }
+    };
+
+    // The server is offline by design, so there is no e-mail recovery: staff
+    // reset a forgotten password and hand over a temporary one.
+    const handleForgotPassword = () => {
+        setError("");
+        setNotice("Ask a teacher or the administrator to reset your password. You will get a temporary one to sign in with.");
     };
 
     return (
@@ -41,7 +49,7 @@ const Home = () => {
                 </div>
 
                 <div className="bg-white rounded-[20px] border border-[#E8E4DE] shadow-[0_4px_24px_rgba(28,26,23,0.07)] overflow-hidden">
-                    <div className="px-7 pt-7 pb-5">
+                    <div className="px-7 py-7">
                         <p className="text-[10px] text-[#A09890] uppercase tracking-[0.1em] mb-5 font-semibold">Sign In</p>
 
                         <LoginForm
@@ -50,25 +58,13 @@ const Home = () => {
                             showPassword={showPassword}
                             loading={loading}
                             error={error}
+                            notice={notice}
                             onUsernameChange={setUsername}
                             onPasswordChange={setPassword}
                             onToggleShowPassword={() => setShowPassword(p => !p)}
                             onSubmit={handleLogin}
-                            onForgotPassword={() => { /* TODO: no backend route yet */ }}
+                            onForgotPassword={handleForgotPassword}
                         />
-                    </div>
-
-                    <div className="flex items-center gap-3 px-7">
-                        <div className="flex-1 h-px bg-[#E8E4DE]" />
-                        <span className="text-xs text-[#A09890]">or</span>
-                        <div className="flex-1 h-px bg-[#E8E4DE]" />
-                    </div>
-
-                    <div className="px-7 pt-5 pb-7 flex flex-col gap-2.5">
-                        <button onClick={() => navigate("/library")}
-                            className="w-full py-3.5 bg-[#F7F5F2] hover:bg-[#F0EDE8] text-[#6B6560] border border-[#E8E4DE] rounded-xl text-sm font-medium cursor-pointer transition-colors">
-                            Continue as Student
-                        </button>
                     </div>
                 </div>
             </div>

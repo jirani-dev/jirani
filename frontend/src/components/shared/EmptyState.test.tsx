@@ -4,13 +4,13 @@ import { describe, expect, it, vi } from 'vitest';
 import { EmptyState } from './EmptyState';
 
 describe('EmptyState role gating', () => {
-    it('admin sees the add action', () => {
+    it('a manager (admin or teacher) sees the add action', () => {
         render(
             <EmptyState
                 icon={BookOpen}
                 label="books"
                 onUpload={vi.fn()}
-                isAdmin
+                canManage
             />,
         );
         expect(screen.getByRole('button', { name: /add books/i })).toBeInTheDocument();
@@ -22,7 +22,7 @@ describe('EmptyState role gating', () => {
                 icon={BookOpen}
                 label="books"
                 onUpload={vi.fn()}
-                isAdmin={false}
+                canManage={false}
             />,
         );
         expect(screen.queryByRole('button', { name: /add books/i })).toBeNull();

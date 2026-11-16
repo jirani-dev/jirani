@@ -32,13 +32,13 @@ def list_tracks(
 
 
 @router.post("/upload", response_model=AudioRead)
-async def upload_track(
+def upload_track(
     file: UploadFile = File(...),
     tags: str = Form(""),
     svc: AudioService = Depends(get_audio_service),
     user: Account = Depends(RoleChecker(WRITE_ROLES)),
 ) -> AudioRead:
-    data = await file.read()
+    data = file.file.read()
     tag_names = [t.strip() for t in tags.split(",") if t.strip()]
     try:
         return svc.upload(data, file.filename or "", tag_names)
@@ -49,12 +49,12 @@ async def upload_track(
 
 
 @router.post("/upload_multiple", response_model=list[AudioRead])
-async def upload_multiple_tracks(
+def upload_multiple_tracks(
     files: list[UploadFile] = File(...),
     svc: AudioService = Depends(get_audio_service),
     user: Account = Depends(RoleChecker(WRITE_ROLES)),
 ) -> list[AudioRead]:
-    payloads = [(await file.read(), file.filename or "") for file in files]
+    payloads = [(file.file.read(), file.filename or "") for file in files]
     try:
         return svc.upload_multiple(payloads)
     except InvalidMediaFile as exc:

@@ -49,6 +49,8 @@ mypy (strict)        PASS | FAIL | NOT RUN   [files: a.py, b.py]
 pytest               PASS | FAIL | NOT RUN   [N passed, M failed]
 npm install          PASS | FAIL | NOT RUN | N/A
 npm run lint         PASS | FAIL | NOT RUN | N/A
+npm run typecheck    PASS | FAIL | NOT RUN | N/A
+npm run test         PASS | FAIL | NOT RUN | N/A
 npm run build        PASS | FAIL | NOT RUN | N/A
 
 INVARIANT AUDIT
@@ -87,6 +89,8 @@ mypy (strict)        PASS   [files: app/models/book.py]
 pytest               PASS   [138 passed]
 npm install          N/A
 npm run lint         N/A
+npm run typecheck    N/A
+npm run test         N/A
 npm run build        N/A
 
 INVARIANT AUDIT

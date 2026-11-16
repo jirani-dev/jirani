@@ -13,6 +13,7 @@ from .account_schema import (
 from .auth_schema import (
     ChangePasswordRequest,
     LoginRequest,
+    PasswordChangeResponse,
     ResetPasswordRequest,
     TokenResponse,
 )
@@ -47,6 +48,7 @@ __all__ = [
     "ChangePasswordRequest",
     "LoginRequest",
     "Page",
+    "PasswordChangeResponse",
     "ResetPasswordRequest",
     # Tag schemas
     "TagBase",

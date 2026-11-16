@@ -5,14 +5,10 @@ import API_BASE from '../../config';
 
 const BASE = '/videos';
 
+// For a native <video src>: the browser streams it with range requests and
+// authenticates with the httpOnly cookie, so no token (or apiFetch) is involved.
 export function getVideoStreamUrl(id: Video['id']): string {
     return `${API_BASE}${BASE}/stream/${id}`;
-}
-
-export async function streamVideo(id: Video['id']): Promise<Blob> {
-    const res = await apiFetch(`${BASE}/stream/${id}`);
-    if (!res.ok) throw await ApiError.fromResponse(res, 'Failed to stream video');
-    return res.blob();
 }
 
 export async function fetchVideos(): Promise<Video[]> {
@@ -27,14 +23,6 @@ export async function uploadVideo(file: File, tags?: string): Promise<Video> {
     formData.append('title', file.name.replace(/\.[^/.]+$/, ''));
     if (tags?.trim()) formData.append('tags', tags.trim());
     const res = await apiFetch(`${BASE}/upload`, { method: 'POST', body: formData });
-    if (!res.ok) throw await ApiError.fromResponse(res, 'Upload failed');
-    return res.json();
-}
-
-export async function uploadVideos(files: File[]): Promise<Video[]> {
-    const formData = new FormData();
-    files.forEach(f => formData.append('files', f));
-    const res = await apiFetch(`${BASE}/upload_multiple`, { method: 'POST', body: formData });
     if (!res.ok) throw await ApiError.fromResponse(res, 'Upload failed');
     return res.json();
 }

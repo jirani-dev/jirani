@@ -25,15 +25,21 @@ class Settings(BaseSettings):
     APP_DESCRIPTION: str = "Offline library management system"
 
     # App settings
-    DEBUG: bool = True
+    # DEBUG echoes every SQL statement to the log (see database.py), which is
+    # noise and I/O a production server does not need: opt-in.
+    DEBUG: bool = False
 
     # Database settings
     DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/jirani_library"
 
     # Security settings
-    SECRET_KEY: str = get_secret_key()
+    # Empty means "not supplied by the environment": __init__ then loads (or
+    # creates) the key file. Resolving it here instead would write the file on
+    # import even when SECRET_KEY is set.
+    SECRET_KEY: str = ""
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 480
+    # Lifetime of both the JWT and the access_token cookie that carries it.
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 120
 
     # File upload settings
     DATA_DIR: Path = BASE_DIR / "data"
