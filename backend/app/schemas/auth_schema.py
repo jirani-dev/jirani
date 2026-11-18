@@ -2,6 +2,8 @@ from typing import Annotated
 
 from pydantic import BaseModel, Field
 
+from app.models import RoleEnum
+
 username_str = Annotated[str, Field(..., min_length=3, max_length=50)]
 password_str = Annotated[str, Field(..., min_length=4, max_length=50)]
 student_password_str = Annotated[str, Field(..., min_length=4, max_length=50)]
@@ -31,5 +33,5 @@ class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     username: str
-    role: str
+    role: RoleEnum
     first_login: bool

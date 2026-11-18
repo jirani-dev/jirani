@@ -13,9 +13,9 @@ Breaking one requires explicit approval, same as the backend invariants.
 |---|---|
 | F1 | **Verify everything.** Nothing is done until the frontend Definition of Done below has run and passed — locally and in CI (the `frontend` check). |
 | F2 | **Tests are the contract.** Every behavior change ships with tests; a bugfix starts with a failing test that reproduces the bug. Never delete or skip a failing test to go green. |
-| F3 | **One HTTP path.** All HTTP goes through `src/services/api/`: `apiFetch` in `client.ts` attaches the Bearer token, and one module per entity wraps its endpoints. No `fetch` or other HTTP client anywhere else. |
+| F3 | **One HTTP path.** The generated client (`src/api/generated/`, built in `src/api/client.ts`) is the only HTTP path. One wrapper module per entity in `src/services/api/` calls it; components and hooks import only the wrappers. No `fetch` or other HTTP client anywhere else. |
 | F4 | **Frozen contract.** The frontend depends only on the API surface pinned under backend invariant 7 (`backend/AGENTS.md`). To depend on anything else, pin it there in the same PR. |
-| F5 | **Client-side gating is UX, never security.** Route and role gating is convenience; the backend `RoleChecker` enforces. Tokens travel only through `apiFetch`; a 401 triggers the re-login flow, not a hidden button. Native media tags authenticate with the `httpOnly` cookie. |
+| F5 | **Client-side gating is UX, never security.** Route and role gating is convenience; the backend `RoleChecker` enforces. Tokens travel only through the generated client's auth middleware (`src/api/client.ts`); a 401 triggers the re-login flow, not a hidden button. Native media tags authenticate with the `httpOnly` cookie. |
 | F6 | **Config centralized, everything TypeScript.** All env and config reads go through `src/config.ts` — typed, validated, and the only reader of `import.meta.env`. No `.js`/`.jsx` app files, the entry point included. No literal API URLs in components. |
 
 ## Backend Integration
@@ -35,17 +35,20 @@ Breaking one requires explicit approval, same as the backend invariants.
 | Pages | `src/pages/<Name>.tsx`, routed in `src/App.tsx` |
 | Hooks | `src/hooks/use<Name>.ts` |
 | Context | `src/context/<Name>Context.tsx` |
-| HTTP | `src/services/api/client.ts` (`apiFetch`) plus one module per entity: `src/services/api/<entity>.ts` (F3) |
-| API types | `src/types.ts` — shapes of the schemas pinned under backend invariant 7 (F4) |
+| HTTP | `src/api/generated/` (generated, never hand-edited), `src/api/client.ts` (client, auth middleware, `unwrap`), one wrapper per entity: `src/services/api/<entity>.ts` (F3) |
+| API types | `src/types.ts` aliases the generated schema types. Never hand-write API shapes (F4) |
 | Settings | `src/config.ts` — the only env reader (F6) |
 | Tests | co-located `*.test.ts(x)`; end-to-end tests in `e2e/` |
 | npm scripts | `dev`, `lint`, `build`; new scripts use the names `typecheck`, `test`, `e2e`, `generate-api` |
+| generate-api | Runs openapi-typescript via 
+px, pinned to 7.13.0 (it needs TypeScript 5; the project is on 7). Input: committed src/api/generated/openapi.json, dumped by ackend/scripts/dump_openapi.py. |
 
 ## Definition of Done
 
 ```bash
 cd frontend
-npm install
+npm ci
+npm run generate-api && git diff --exit-code src/api/generated
 npm run lint
 npm run typecheck
 npm run test

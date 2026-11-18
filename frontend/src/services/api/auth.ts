@@ -1,31 +1,28 @@
 // src/services/api/auth.ts
-import { ApiError, apiFetch } from './client';
-import { LoginResponse, Role } from '../../types';
+import { api, unwrap } from '../../api/client';
+import { Role } from '../../types';
 
-export async function login(username: string, password: string): Promise<LoginResponse> {
-    const res = await apiFetch('/auth/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
-    });
-    if (!res.ok) throw await ApiError.fromResponse(res, 'Invalid username or password.');
-    return res.json();
+export async function login(username: string, password: string) {
+    return unwrap(
+        api.POST('/auth/token', { body: { username, password } }),
+        'Invalid username or password.',
+    );
 }
 
 // Clears the access_token cookie server-side (localStorage/context state
-// is the caller's job — see AuthContext.logout). Best-effort: logging out
+// is the caller's job, see AuthContext.logout). Best-effort: logging out
 // must still work from the user's point of view even if this call fails.
 export async function logout(): Promise<void> {
-    await apiFetch('/auth/logout', { method: 'POST' }).catch(() => {});
+    await api.POST('/auth/logout').catch(() => {});
 }
 
 export async function changePassword(oldPassword: string, newPassword: string): Promise<void> {
-    const res = await apiFetch('/auth/change-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ old_password: oldPassword, new_password: newPassword }),
-    });
-    if (!res.ok) throw await ApiError.fromResponse(res, 'Failed to change password.');
+    await unwrap(
+        api.POST('/auth/change-password', {
+            body: { old_password: oldPassword, new_password: newPassword },
+        }),
+        'Failed to change password.',
+    );
 }
 
 export interface CreateUserRequest {
@@ -42,15 +39,9 @@ export interface CreateUserResponse {
 
 // Maps to POST /auth/users. Caller must already be admin/teacher
 // (enforced server-side via RoleChecker). Admin accounts cannot be
-// created through this endpoint — only student/teacher.
-export async function createUser(data: CreateUserRequest): Promise<CreateUserResponse> {
-    const res = await apiFetch('/auth/users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-    });
-    if (!res.ok) throw await ApiError.fromResponse(res, 'Failed to create account.');
-    return res.json();
+// created through this endpoint, only student/teacher.
+export async function createUser(data: CreateUserRequest) {
+    return unwrap(api.POST('/auth/users', { body: data }), 'Failed to create account.');
 }
 
 // No backend route for OTP/forgot-password or self-signup. First-admin

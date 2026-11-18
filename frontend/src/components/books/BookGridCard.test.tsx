@@ -6,7 +6,7 @@ import type { Book } from '../../types';
 
 vi.mock('pdfjs-dist', () => ({ GlobalWorkerOptions: {} }));
 
-const book: Book = { uid: 'b1', title: 'Things Fall Apart', extension: 'pdf' };
+const book: Book = { id: 1, uid: 'b1', title: 'Things Fall Apart', extension: 'pdf', created_at: '2026-01-01T00:00:00Z', cover_url: null, tags: [] };
 
 const renderCard = (isAdmin: boolean) =>
     render(

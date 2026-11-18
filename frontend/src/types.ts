@@ -1,49 +1,20 @@
 // src/types.ts
-export interface Tag {
-    id: number | string;
-    name: string;
-}
+// Shapes come from the generated OpenAPI schema (src/api/generated).
+// Do not hand-write API shapes here; add short aliases only.
+import type { components } from './api/generated/schema';
 
-export interface Book {
-    uid: string;
-    title: string;
-    extension: string;
-    cover_url?: string | null;
-    author?: string | null;
-    level?: string | null;
-    genre?: string | null;
-    language?: string | null;
-    tags?: Tag[];
-}
+type Schemas = components['schemas'];
 
-export interface Video {
-    id: number | string;
-    title: string;
-    description?: string | null;
-    tags?: Tag[];
-}
-
-export interface Audio {
-    id: number | string;
-    title: string;
-    description?: string | null;
-    audio_url?: string;
-    tags?: Tag[];
-}
+export type Tag = Schemas['TagRead'];
+export type Book = Schemas['BookRead'];
+export type Video = Schemas['VideoRead'];
+export type Audio = Schemas['AudioRead'];
+export type LoginResponse = Schemas['TokenResponse'];
+export type Role = Schemas['RoleEnum'];
 
 export interface Page<T> {
     items: T[];
     total: number;
     limit: number;
     offset: number;
-}
-
-export type Role = "admin" | "teacher" | "student";
-
-export interface LoginResponse {
-    access_token: string;
-    token_type: string;
-    username: string;
-    role: Role;
-    first_login: boolean;
 }
