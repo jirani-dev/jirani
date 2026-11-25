@@ -41,7 +41,7 @@ const Home = () => {
                 </div>
 
                 <div className="bg-white rounded-[20px] border border-[#E8E4DE] shadow-[0_4px_24px_rgba(28,26,23,0.07)] overflow-hidden">
-                    <div className="px-7 pt-7 pb-5">
+                    <div className="px-7 pt-7 pb-7">
                         <p className="text-[10px] text-[#A09890] uppercase tracking-[0.1em] mb-5 font-semibold">Sign In</p>
 
                         <LoginForm
@@ -56,19 +56,6 @@ const Home = () => {
                             onSubmit={handleLogin}
                             onForgotPassword={() => { /* TODO: no backend route yet */ }}
                         />
-                    </div>
-
-                    <div className="flex items-center gap-3 px-7">
-                        <div className="flex-1 h-px bg-[#E8E4DE]" />
-                        <span className="text-xs text-[#A09890]">or</span>
-                        <div className="flex-1 h-px bg-[#E8E4DE]" />
-                    </div>
-
-                    <div className="px-7 pt-5 pb-7 flex flex-col gap-2.5">
-                        <button onClick={() => navigate("/library")}
-                            className="w-full py-3.5 bg-[#F7F5F2] hover:bg-[#F0EDE8] text-[#6B6560] border border-[#E8E4DE] rounded-xl text-sm font-medium cursor-pointer transition-colors">
-                            Continue as Student
-                        </button>
                     </div>
                 </div>
             </div>

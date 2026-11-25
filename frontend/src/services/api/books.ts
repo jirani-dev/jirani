@@ -7,9 +7,6 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 
 const BASE = '/books';
 
-export function getBookStreamUrl(uid: Book['uid']): string {
-    return `${BASE}/${uid}/stream`;
-}
 export function getBookReadUrl(uid: Book['uid']): string {
     return `${BASE}/${uid}/read`;
 }

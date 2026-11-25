@@ -1,5 +1,6 @@
 // src/pages/Library.tsx
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -7,10 +8,9 @@ import {
 } from "lucide-react";
 
 import { Book, Video, Audio, Tag as TagType } from "../types";
-import * as booksApi from "../services/api/books";
-import { useVideos } from "../hooks/useVideos";
-import { useAudio } from "../hooks/useAudio";
-import { useBookSearch } from "../hooks/useBookSearch";
+import { useVideos, videoKeys } from "../hooks/useVideos";
+import { useAudio, audioKeys } from "../hooks/useAudio";
+import { useBookSearch, useBookTags, bookKeys } from "../hooks/useBookSearch";
 
 import { TagDropdown } from "../components/shared/TagDropdown";
 import { EmptyState } from "../components/shared/EmptyState";
@@ -31,6 +31,7 @@ const uniqueTags = (items: { tags?: TagType[] }[]): TagType[] => [
 const Library = () => {
     const { isAdmin, logout, auth } = useAuth();
     const navigate = useNavigate();
+    const queryClient = useQueryClient();
 
     const isMobile = window.innerWidth < 640;
 
@@ -46,26 +47,23 @@ const Library = () => {
     const [showAddTeacher, setShowAddTeacher] = useState(false);
 
     // Books support real server-side search/tag filtering.
-    const { books, refresh: refreshBooks, setBooks } = useBookSearch(selectedBookTags, search);
+    const { data: booksPage, isLoading: booksLoading } = useBookSearch(selectedBookTags, search);
     // Videos/audio have no search endpoint — fetch the full list, filter client-side below.
-    const { videos, refresh: refreshVideos, setVideos } = useVideos();
-    const { audioTracks, refresh: refreshAudio, setAudioTracks } = useAudio();
-
+    const { data: videos = [], isLoading: videosLoading } = useVideos();
+    const { data: audioTracks = [], isLoading: audioLoading } = useAudio();
     // Unique book tags come from the unfiltered set, so they don't shrink as filters narrow the list.
-    const [bookTagsList, setBookTagsList] = useState<TagType[]>([]);
-    const refreshBookTags = async () => {
-        const page = await booksApi.searchBooks();
-        setBookTagsList(uniqueTags(page.items));
-    };
+    const { data: bookTagsPage } = useBookTags();
 
-    const [loading, setLoading] = useState(true);
-    useEffect(() => {
-        // The hooks above already fetch on mount; this just tracks combined
-        // loading state and pulls the unfiltered tag list once.
-        Promise.all([refreshBooks(), refreshVideos(), refreshAudio(), refreshBookTags()])
-            .finally(() => setLoading(false));
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    const books = booksPage?.items ?? [];
+    const loading = booksLoading || videosLoading || audioLoading;
+    const bookTagsList = useMemo(() => uniqueTags(bookTagsPage?.items ?? []), [bookTagsPage]);
+
+    // Mutations happen in the cards/modals; the server is the source of truth,
+    // so each one just invalidates the affected query keys. `bookKeys.all` is
+    // prefix-matched and also refreshes the book tag list.
+    const invalidateBooks = () => queryClient.invalidateQueries({ queryKey: bookKeys.all });
+    const invalidateVideos = () => queryClient.invalidateQueries({ queryKey: videoKeys.all });
+    const invalidateAudio = () => queryClient.invalidateQueries({ queryKey: audioKeys.all });
 
     const filteredVideos = useMemo(() => videos.filter(v =>
         v.title.toLowerCase().includes(search.toLowerCase()) &&
@@ -217,7 +215,7 @@ const Library = () => {
                             : <div className={`grid grid-cols-[repeat(auto-fill,minmax(130px,1fr))] ${isMobile ? "gap-2.5" : "gap-4"}`}>
                                 {books.map(book => (
                                     <BookGridCard key={book.uid} book={book} isAdmin={isAdmin}
-                                        onDelete={uid => setBooks(prev => prev.filter(b => b.uid !== uid))}
+                                        onDelete={invalidateBooks}
                                         onEdit={setEditingBook} />
                                 ))}
                             </div>
@@ -229,8 +227,8 @@ const Library = () => {
                                     <AudioGridCard key={audio.id} audio={audio} isAdmin={isAdmin}
                                         onPlay={setCurrentlyPlayingAudio}
                                         currentlyPlaying={currentlyPlayingAudio}
-                                        onDelete={id => setAudioTracks(prev => prev.filter(a => a.id !== id))}
-                                        onUpdate={updated => setAudioTracks(prev => prev.map(a => a.id === updated.id ? updated : a))} />
+                                        onDelete={invalidateAudio}
+                                        onUpdate={invalidateAudio} />
                                 ))}
                             </div>
                     ) : (
@@ -240,8 +238,8 @@ const Library = () => {
                                 {filteredVideos.map(video => (
                                     <VideoGridCard key={video.id} video={video} isAdmin={isAdmin}
                                         onPlay={setPlayingVideo}
-                                        onDelete={id => setVideos(prev => prev.filter(v => v.id !== id))}
-                                        onUpdate={updated => setVideos(prev => prev.map(v => v.id === updated.id ? updated : v))} />
+                                        onDelete={invalidateVideos}
+                                        onUpdate={invalidateVideos} />
                                 ))}
                             </div>
                     )}
@@ -252,17 +250,16 @@ const Library = () => {
                 <UploadModal
                     type={uploadType}
                     onClose={() => setShowUpload(false)}
-                    onSuccess={() => { refreshBooks(); refreshVideos(); refreshAudio(); refreshBookTags(); }}
+                    onSuccess={() => { invalidateBooks(); invalidateVideos(); invalidateAudio(); }}
                 />
             )}
 
             {editingBook && isAdmin && (
                 <BookEditModal book={editingBook}
                     onClose={() => setEditingBook(null)}
-                    onUpdate={updated => {
-                        setBooks(prev => prev.map(b => b.uid === updated.uid ? updated : b));
+                    onUpdate={() => {
+                        invalidateBooks();
                         setEditingBook(null);
-                        refreshBookTags();
                     }} />
             )}
 

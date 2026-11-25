@@ -41,7 +41,10 @@ describe('UploadModal — single-file audio upload (strict index-access path)', 
 
         await user.click(screen.getByRole('button', { name: /upload/i }));
 
-        await waitFor(() => expect(uploadHits).toBe(1));
+        // Wait for the body, not just the hit: the handler counts the hit before
+        // it finishes reading the body, so waiting on uploadHits alone is a race.
+        await waitFor(() => expect(lastBodyText).not.toBeNull());
+        expect(uploadHits).toBe(1);
         expect(lastBodyText).toContain('name="file"');
         // undici serializes the jsdom-realm File as a generic Blob (filename
         // "blob"), so the file's type is the stable cross-realm assertion.

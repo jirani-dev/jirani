@@ -1,15 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Video } from '../types';
+import { useQuery } from '@tanstack/react-query';
 import * as videosApi from '../services/api/videos';
 
+export const videoKeys = { all: ['videos'] as const };
+
 export function useVideos() {
-    const [videos, setVideos] = useState<Video[]>([]);
-
-    const refresh = useCallback(async () => {
-        setVideos(await videosApi.fetchVideos());
-    }, []);
-
-    useEffect(() => { refresh(); }, [refresh]);
-
-    return { videos, refresh, setVideos };
+    return useQuery({ queryKey: videoKeys.all, queryFn: videosApi.fetchVideos });
 }
