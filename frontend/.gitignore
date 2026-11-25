@@ -39,3 +39,6 @@ coverage/
 npm-shrinkwrap.json
 bun.lock
 bun.lockb
+
+# Vite optimizer cache (machine-local)
+.vite

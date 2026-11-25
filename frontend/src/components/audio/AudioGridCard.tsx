@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react';
 import { Trash2, Loader2, Pencil, Check, X, Music } from 'lucide-react';
 import { Audio } from '../../types';
 import * as audioApi from '../../services/api/audio';
-import { useAudioStream } from '../../hooks/useAudioStream';
 
 const inputStyle =
     "w-full px-3.5 py-2.5 border border-[#E8E4DE] rounded-[10px] text-[13px] text-[#1C1A17] bg-white outline-none box-border font-sans appearance-none [-webkit-text-fill-color:#1C1A17]";
@@ -23,7 +22,6 @@ export const AudioGridCard = ({ audio, isAdmin, onDelete, onUpdate, onPlay, curr
     const [editDesc, setEditDesc] = useState(audio.description || '');
     const [editTags, setEditTags] = useState(audio.tags?.map(t => t.name).join(', ') || '');
     const audioRef = useRef<HTMLAudioElement>(null);
-    const streamUrl = useAudioStream(audio.id);
 
     useEffect(() => {
         if (currentlyPlaying !== audio.id && audioRef.current) audioRef.current.pause();
@@ -58,7 +56,7 @@ export const AudioGridCard = ({ audio, isAdmin, onDelete, onUpdate, onPlay, curr
                     <Music size={22} color="#fff" />
                 </div>
                 <audio ref={audioRef} controls onPlay={() => onPlay(audio.id)} className="w-full h-9">
-                    <source src={streamUrl ?? undefined} />
+                    <source src={audioApi.getAudioStreamUrl(audio.id)} />
                 </audio>
             </div>
 
@@ -93,10 +91,10 @@ export const AudioGridCard = ({ audio, isAdmin, onDelete, onUpdate, onPlay, curr
                     </div>
                     {isAdmin && (
                         <div className="flex gap-1.5 flex-shrink-0">
-                            <button onClick={() => setEditing(true)} className="w-[30px] h-[30px] rounded-lg border border-[#E8E4DE] bg-white cursor-pointer flex items-center justify-center text-[#6B6560]">
+                            <button onClick={() => setEditing(true)} aria-label="Edit audio" className="w-[30px] h-[30px] rounded-lg border border-[#E8E4DE] bg-white cursor-pointer flex items-center justify-center text-[#6B6560]">
                                 <Pencil size={12} />
                             </button>
-                            <button onClick={handleDelete} disabled={deleting} className="w-[30px] h-[30px] rounded-lg border border-[#FADADD] bg-[#FEF2F0] cursor-pointer flex items-center justify-center text-[#D94F3D] disabled:opacity-40">
+                            <button onClick={handleDelete} disabled={deleting} aria-label="Delete audio" className="w-[30px] h-[30px] rounded-lg border border-[#FADADD] bg-[#FEF2F0] cursor-pointer flex items-center justify-center text-[#D94F3D] disabled:opacity-40">
                                 {deleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
                             </button>
                         </div>

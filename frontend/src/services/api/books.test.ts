@@ -55,3 +55,20 @@ describe('searchBooks paging', () => {
         expect(url.searchParams.get('offset')).toBe('0');
     });
 });
+
+describe('searchBooks cancellation', () => {
+    it('rejects with an AbortError when the caller aborts the request', async () => {
+        server.use(
+            http.get('*/books/', async () => {
+                await new Promise((resolve) => setTimeout(resolve, 200));
+                return HttpResponse.json({ items: [], total: 0, limit: 100, offset: 0 });
+            }),
+        );
+        const controller = new AbortController();
+
+        const pending = searchBooks({}, controller.signal);
+        controller.abort();
+
+        await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+    });
+});

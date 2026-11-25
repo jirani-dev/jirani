@@ -9,12 +9,6 @@ export function getVideoStreamUrl(id: Video['id']): string {
     return `${API_BASE}${BASE}/stream/${id}`;
 }
 
-export async function streamVideo(id: Video['id']): Promise<Blob> {
-    const res = await apiFetch(`${BASE}/stream/${id}`);
-    if (!res.ok) throw await ApiError.fromResponse(res, 'Failed to stream video');
-    return res.blob();
-}
-
 export async function fetchVideos(): Promise<Video[]> {
     const res = await apiFetch(`${BASE}/`);
     if (!res.ok) throw await ApiError.fromResponse(res, 'Failed to fetch videos');

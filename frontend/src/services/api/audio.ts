@@ -1,17 +1,12 @@
 // src/services/api/audio.ts
 import { ApiError, apiFetch } from './client';
 import { Audio } from '../../types';
+import API_BASE from '../../config';
 
 const BASE = '/audio';
 
 export function getAudioStreamUrl(id: Audio['id']): string {
-    return `${BASE}/stream/${id}`;
-}
-
-export async function streamAudio(id: Audio['id']): Promise<Blob> {
-    const res = await apiFetch(`${BASE}/stream/${id}`);
-    if (!res.ok) throw await ApiError.fromResponse(res, 'Failed to stream audio');
-    return res.blob();
+    return `${API_BASE}${BASE}/stream/${id}`;
 }
 
 export async function fetchAudioTracks(): Promise<Audio[]> {

@@ -1,15 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Audio } from '../types';
+import { useQuery } from '@tanstack/react-query';
 import * as audioApi from '../services/api/audio';
 
+export const audioKeys = { all: ['audio'] as const };
+
 export function useAudio() {
-    const [audioTracks, setAudioTracks] = useState<Audio[]>([]);
-
-    const refresh = useCallback(async () => {
-        setAudioTracks(await audioApi.fetchAudioTracks());
-    }, []);
-
-    useEffect(() => { refresh(); }, [refresh]);
-
-    return { audioTracks, refresh, setAudioTracks };
+    return useQuery({ queryKey: audioKeys.all, queryFn: audioApi.fetchAudioTracks });
 }
