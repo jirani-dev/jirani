@@ -18,7 +18,9 @@ export function useBookSearch(
 ) {
     return useQuery({
         queryKey: bookKeys.search(tags, title, page, size),
-        queryFn: () => booksApi.searchBooks({ tags, title, page, size }),
+        // React Query hands us an AbortSignal and aborts it when the key changes
+        // or the component unmounts, so a stale keystroke's request is cancelled.
+        queryFn: ({ signal }) => booksApi.searchBooks({ tags, title, page, size }, signal),
         // Typing in the search box changes the key on every keystroke. Keep the
         // previous results on screen instead of flashing the page spinner.
         placeholderData: keepPreviousData,

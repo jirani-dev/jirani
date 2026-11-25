@@ -91,10 +91,10 @@ export const AudioGridCard = ({ audio, isAdmin, onDelete, onUpdate, onPlay, curr
                     </div>
                     {isAdmin && (
                         <div className="flex gap-1.5 flex-shrink-0">
-                            <button onClick={() => setEditing(true)} className="w-[30px] h-[30px] rounded-lg border border-[#E8E4DE] bg-white cursor-pointer flex items-center justify-center text-[#6B6560]">
+                            <button onClick={() => setEditing(true)} aria-label="Edit audio" className="w-[30px] h-[30px] rounded-lg border border-[#E8E4DE] bg-white cursor-pointer flex items-center justify-center text-[#6B6560]">
                                 <Pencil size={12} />
                             </button>
-                            <button onClick={handleDelete} disabled={deleting} className="w-[30px] h-[30px] rounded-lg border border-[#FADADD] bg-[#FEF2F0] cursor-pointer flex items-center justify-center text-[#D94F3D] disabled:opacity-40">
+                            <button onClick={handleDelete} disabled={deleting} aria-label="Delete audio" className="w-[30px] h-[30px] rounded-lg border border-[#FADADD] bg-[#FEF2F0] cursor-pointer flex items-center justify-center text-[#D94F3D] disabled:opacity-40">
                                 {deleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
                             </button>
                         </div>

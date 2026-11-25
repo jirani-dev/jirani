@@ -21,7 +21,10 @@ export interface BookSearchParams extends PageRequest {
     extension?: string;
 }
 
-export async function searchBooks(params: BookSearchParams = {}): Promise<Page<Book>> {
+export async function searchBooks(
+    params: BookSearchParams = {},
+    signal?: AbortSignal,
+): Promise<Page<Book>> {
     const query = new URLSearchParams();
     if (params.title?.trim()) query.set('title', params.title.trim());
     if (params.author?.trim()) query.set('author', params.author.trim());
@@ -34,7 +37,7 @@ export async function searchBooks(params: BookSearchParams = {}): Promise<Page<B
     query.set('limit', String(limit));
     query.set('offset', String(offset));
 
-    const res = await apiFetch(`${BASE}/?${query}`);
+    const res = await apiFetch(`${BASE}/?${query}`, signal ? { signal } : {});
     if (!res.ok) throw await ApiError.fromResponse(res, 'Failed to fetch books');
     return res.json();
 }

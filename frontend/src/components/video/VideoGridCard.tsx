@@ -58,10 +58,12 @@ export const VideoGridCard = ({ video, isAdmin, onDelete, onUpdate, onPlay }: Vi
                 {isAdmin && (
                     <div className="absolute top-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button onClick={e => { e.stopPropagation(); setEditing(true); }}
+                            aria-label="Edit video"
                             className="w-[30px] h-[30px] rounded-lg border-none bg-white/90 cursor-pointer flex items-center justify-center text-[#6B6560]">
                             <Pencil size={12} />
                         </button>
                         <button onClick={handleDelete} disabled={deleting}
+                            aria-label="Delete video"
                             className="w-[30px] h-[30px] rounded-lg border-none bg-white/90 cursor-pointer flex items-center justify-center text-[#D94F3D] disabled:opacity-40">
                             {deleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
                         </button>

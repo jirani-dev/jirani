@@ -116,6 +116,32 @@ describe('useBookSearch', () => {
     });
 });
 
+describe('useBookSearch cancellation', () => {
+    it('aborts the in-flight request when the filters change', async () => {
+        const aborted: string[] = [];
+        server.use(
+            http.get('*/books/', async ({ request }) => {
+                const title = new URL(request.url).searchParams.get('title') ?? '';
+                request.signal.addEventListener('abort', () => aborted.push(title));
+                if (title === '') await new Promise((resolve) => setTimeout(resolve, 200));
+                return HttpResponse.json(page);
+            }),
+        );
+        const { wrapper } = makeWrapper();
+
+        const { result, rerender } = renderHook(({ title }) => useBookSearch([], title), {
+            wrapper,
+            initialProps: { title: '' },
+        });
+        // Change the filter while the first (slow) request is still in flight.
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        rerender({ title: 'fall' });
+
+        await waitFor(() => expect(result.current.isSuccess).toBe(true));
+        await waitFor(() => expect(aborted).toEqual(['']));
+    });
+});
+
 describe('useBookTags', () => {
     it('uses the unfiltered query (no title/tags params)', async () => {
         let requestedUrl = '';
