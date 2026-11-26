@@ -1,9 +1,12 @@
+import re
 from collections.abc import Callable
 from pathlib import Path
+from uuid import UUID
 
 import pytest
 
 from app.config import settings
+from app.services import book_file_storage
 from app.services.book_errors import BookNotFound
 from app.services.book_file_storage import BookFileStorage
 
@@ -109,6 +112,23 @@ def test_save_that_fails_part_way_leaves_no_file(
     with pytest.raises(OSError):
         storage.save(b"0123456789", "My Book.pdf", "bk0004")
     assert list(storage.upload_dir.iterdir()) == []
+
+
+def test_save_cover_names_carry_a_whole_uuid(storage: BookFileStorage) -> None:
+    name = storage.save_cover("bk0003", b"one", "png")
+    assert re.fullmatch(r"bk0003_[0-9a-f]{32}\.png", name)
+
+
+def test_save_cover_never_overwrites_the_cover_in_use(
+    storage: BookFileStorage, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # A clash used to write the new cover under the old name, which the update
+    # then deleted as "the old cover", leaving the book pointing at nothing.
+    monkeypatch.setattr(book_file_storage, "uuid4", lambda: UUID(int=1))
+    first = storage.save_cover("bk0003", b"one", "png")
+    with pytest.raises(FileExistsError):
+        storage.save_cover("bk0003", b"two", "png")
+    assert (storage.cover_dir / first).read_bytes() == b"one"
 
 
 def test_save_cover_that_fails_part_way_leaves_no_file(
