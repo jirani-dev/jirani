@@ -1,3 +1,4 @@
+import errno
 import re
 from collections.abc import Callable
 from pathlib import Path, PurePosixPath
@@ -125,3 +126,16 @@ def test_save_that_fails_part_way_leaves_no_file(
     with pytest.raises(OSError):
         MediaFileStorage(tmp_path).save(b"0123456789", "clip.mp4")
     assert list(tmp_path.iterdir()) == []
+
+
+def test_a_cleanup_that_also_fails_does_not_hide_why_the_write_failed(
+    tmp_path: Path, fill_disk: Callable[[], None], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def read_only(self: Path, missing_ok: bool = False) -> None:
+        raise PermissionError(errno.EROFS, "Read-only file system")
+
+    fill_disk()
+    monkeypatch.setattr(Path, "unlink", read_only)
+    with pytest.raises(OSError) as raised:
+        MediaFileStorage(tmp_path).save(b"0123456789", "clip.mp4")
+    assert raised.value.errno == errno.ENOSPC

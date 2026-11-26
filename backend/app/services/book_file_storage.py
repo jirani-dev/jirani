@@ -34,8 +34,8 @@ class BookFileStorage:
         # lifetime, so a replacement written under the old name would keep
         # showing the old image; a distinct name also means the previous
         # cover can be deleted without ever touching the new one. A whole
-        # uuid makes a clash negligible, and write_new_file makes one harmless:
-        # it fails rather than overwrite the cover in use.
+        # uuid makes a clash negligible; should one happen, write_new_file
+        # fails the upload rather than overwrite the cover in use.
         name = f"{uid}_{uuid4().hex}.{ext}"
         self.cover_dir.mkdir(parents=True, exist_ok=True)
         write_new_file(self.cover_dir / name, data)

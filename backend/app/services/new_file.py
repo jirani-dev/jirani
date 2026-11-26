@@ -1,3 +1,4 @@
+import contextlib
 from pathlib import Path
 
 
@@ -14,5 +15,8 @@ def write_new_file(target: Path, data: bytes) -> None:
         with file:
             file.write(data)
     except BaseException:
-        target.unlink(missing_ok=True)
+        # A failed removal must not replace the error that explains the
+        # failed write.
+        with contextlib.suppress(OSError):
+            target.unlink(missing_ok=True)
         raise
