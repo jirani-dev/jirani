@@ -1,4 +1,5 @@
 import zipfile
+from collections.abc import Callable
 from pathlib import Path
 
 import pymupdf
@@ -143,5 +144,22 @@ def test_oversized_cover_rejected(
     source = tmp_path / "bk0001.pdf"
     _write_real_pdf(source)
     dest = tmp_path / "covers"
+    assert CoverGenerator().generate(source, dest) is False
+    assert list(dest.iterdir()) == []
+
+
+@pytest.mark.parametrize("kind", ["pdf", "epub"])
+def test_a_cover_write_that_fails_part_way_leaves_no_file(
+    kind: str, tmp_path: Path, fill_disk: Callable[[], None]
+) -> None:
+    # generate() reports a failure as False, so its caller never learns the
+    # name of a half-written PNG and cannot remove it; generate() must.
+    source = tmp_path / f"bk0001.{kind}"
+    if kind == "pdf":
+        _write_real_pdf(source)
+    else:
+        _write_epub_with_cover(source)
+    dest = tmp_path / "covers"
+    fill_disk()
     assert CoverGenerator().generate(source, dest) is False
     assert list(dest.iterdir()) == []

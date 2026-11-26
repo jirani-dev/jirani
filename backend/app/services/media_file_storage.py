@@ -2,6 +2,7 @@ from pathlib import Path, PureWindowsPath
 from uuid import uuid4
 
 from app.services.media_errors import MediaNotFound
+from app.services.new_file import write_new_file
 
 
 class MediaFileStorage:
@@ -17,7 +18,7 @@ class MediaFileStorage:
         name = PureWindowsPath(filename).name or "upload"
         self.save_dir.mkdir(parents=True, exist_ok=True)
         target = self.save_dir / f"{uuid4()}_{name}"
-        target.write_bytes(file_bytes)
+        write_new_file(target, file_bytes)
         return str(target)
 
     def resolve(self, path: str) -> Path:

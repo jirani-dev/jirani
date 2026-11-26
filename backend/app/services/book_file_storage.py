@@ -5,6 +5,7 @@ from uuid import uuid4
 
 from app.config import settings
 from app.services.book_errors import BookNotFound
+from app.services.new_file import write_new_file
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +26,7 @@ class BookFileStorage:
     def save(self, file_bytes: bytes, filename: str, uid: str) -> str:
         safe_name = self._safe_name(filename, uid)
         self.upload_dir.mkdir(parents=True, exist_ok=True)
-        (self.upload_dir / safe_name).write_bytes(file_bytes)
+        write_new_file(self.upload_dir / safe_name, file_bytes)
         return safe_name
 
     def save_cover(self, uid: str, data: bytes, ext: str) -> str:
@@ -35,7 +36,7 @@ class BookFileStorage:
         # cover can be deleted without ever touching the new one.
         name = f"{uid}_{uuid4().hex[:8]}.{ext}"
         self.cover_dir.mkdir(parents=True, exist_ok=True)
-        (self.cover_dir / name).write_bytes(data)
+        write_new_file(self.cover_dir / name, data)
         return name
 
     def delete(self, rel_path: str, *, missing_ok: bool = False) -> None:

@@ -1,4 +1,5 @@
 import re
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -90,3 +91,12 @@ def test_delete_removes_file_and_is_silent_when_missing(tmp_path: Path) -> None:
     storage.delete(saved)
     assert not Path(saved).exists()
     storage.delete(saved)
+
+
+def test_save_that_fails_part_way_leaves_no_file(
+    tmp_path: Path, fill_disk: Callable[[], None]
+) -> None:
+    fill_disk()
+    with pytest.raises(OSError):
+        MediaFileStorage(tmp_path).save(b"0123456789", "clip.mp4")
+    assert list(tmp_path.iterdir()) == []

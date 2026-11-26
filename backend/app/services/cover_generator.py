@@ -7,6 +7,7 @@ from pathlib import Path
 import pymupdf
 
 from app.config import settings
+from app.services.new_file import write_new_file
 
 logger = logging.getLogger(__name__)
 
@@ -25,27 +26,36 @@ class CoverGenerator:
         try:
             dest_dir.mkdir(parents=True, exist_ok=True)
             suffix = source_path.suffix.lower()
+            png: bytes | None
             if suffix == ".pdf":
-                return self._from_pdf(source_path, dest_dir)
-            if suffix == ".epub":
-                return self._from_epub(source_path, dest_dir)
-            logger.warning("Unsupported cover source extension: %s", suffix)
-            return False
+                png = self._from_pdf(source_path)
+            elif suffix == ".epub":
+                png = self._from_epub(source_path)
+            else:
+                logger.warning("Unsupported cover source extension: %s", suffix)
+                return False
+            # The cover is finished and measured before anything is written,
+            # and write_new_file removes a write that fails part-way, so no
+            # outcome but True leaves a file behind. A caller told False has
+            # no name to clean up.
+            if png is None or len(png) > settings.MAX_COVER_SIZE:
+                return False
+            write_new_file(dest_dir / f"{source_path.stem}.png", png)
+            return True
         except Exception:
             logger.exception("Cover generation failed for %s", source_path)
             return False
 
-    def _from_pdf(self, source_path: Path, dest_dir: Path) -> bool:
-        dest_file = dest_dir / f"{source_path.stem}.png"
+    def _from_pdf(self, source_path: Path) -> bytes:
         with pymupdf.open(str(source_path)) as doc:  # type: ignore[no-untyped-call]
             page = doc.load_page(0)
             pix = page.get_pixmap(
                 matrix=pymupdf.Matrix(0.5, 0.5)  # type: ignore[no-untyped-call]
             )
-            pix.save(str(dest_file))
-        return self._keep_if_small_enough(dest_file)
+            png: bytes = pix.tobytes("png")
+        return png
 
-    def _from_epub(self, source_path: Path, dest_dir: Path) -> bool:
+    def _from_epub(self, source_path: Path) -> bytes | None:
         cover_bytes: bytes | None = None
 
         with zipfile.ZipFile(str(source_path), "r") as z:
@@ -113,13 +123,11 @@ class CoverGenerator:
                         break
 
         if cover_bytes:
-            dest_file = dest_dir / f"{source_path.stem}.png"
-            self._write_png(cover_bytes, dest_file)
-            return self._keep_if_small_enough(dest_file)
+            return self._to_png(cover_bytes)
 
-        return False
+        return None
 
-    def _write_png(self, image_bytes: bytes, dest_file: Path) -> None:
+    def _to_png(self, image_bytes: bytes) -> bytes:
         """Re-encode an embedded cover as the PNG its file name promises.
 
         EPUB covers are mostly JPEGs of arbitrary size. Decoding also rejects
@@ -134,13 +142,8 @@ class CoverGenerator:
             pix = pymupdf.Pixmap(  # type: ignore[no-untyped-call]
                 pix, _MAX_COVER_WIDTH, height
             )
-        pix.save(str(dest_file))  # type: ignore[no-untyped-call]
-
-    def _keep_if_small_enough(self, dest_file: Path) -> bool:
-        if dest_file.stat().st_size > settings.MAX_COVER_SIZE:
-            dest_file.unlink(missing_ok=True)
-            return False
-        return True
+        png: bytes = pix.tobytes("png")  # type: ignore[no-untyped-call]
+        return png
 
     def _join(self, base: str, rel: str) -> str:
         parts = f"{base}/{rel}".split("/")

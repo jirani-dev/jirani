@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -92,3 +93,28 @@ def test_delete_cover_missing_is_silent(storage: BookFileStorage) -> None:
 
 def test_cover_dir_accessor(storage: BookFileStorage, tmp_path: Path) -> None:
     assert storage.cover_dir == tmp_path / "covers"
+
+
+def test_save_never_overwrites_an_existing_book_file(storage: BookFileStorage) -> None:
+    first = storage.save(b"one", "My Book.pdf", "bk0001")
+    with pytest.raises(FileExistsError):
+        storage.save(b"two", "My Book.pdf", "bk0001")
+    assert (storage.upload_dir / first).read_bytes() == b"one"
+
+
+def test_save_that_fails_part_way_leaves_no_file(
+    storage: BookFileStorage, fill_disk: Callable[[], None]
+) -> None:
+    fill_disk()
+    with pytest.raises(OSError):
+        storage.save(b"0123456789", "My Book.pdf", "bk0004")
+    assert list(storage.upload_dir.iterdir()) == []
+
+
+def test_save_cover_that_fails_part_way_leaves_no_file(
+    storage: BookFileStorage, fill_disk: Callable[[], None]
+) -> None:
+    fill_disk()
+    with pytest.raises(OSError):
+        storage.save_cover("bk0004", b"0123456789", "png")
+    assert list(storage.cover_dir.iterdir()) == []
