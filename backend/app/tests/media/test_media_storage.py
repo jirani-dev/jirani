@@ -1,6 +1,6 @@
 import re
 from collections.abc import Callable
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 import pytest
 
@@ -91,6 +91,31 @@ def test_delete_removes_file_and_is_silent_when_missing(tmp_path: Path) -> None:
     storage.delete(saved)
     assert not Path(saved).exists()
     storage.delete(saved)
+
+
+@pytest.mark.parametrize(
+    "client_name",
+    [
+        "a" * 300 + ".mp4",
+        "Kiswahili somo la kwanza " * 9 + ".mp3",
+        # 240 bytes in UTF-8: over the limit of a Linux file name once the
+        # uuid prefix is added, though only 80 characters.
+        "数学" * 40 + ".mp4",
+    ],
+)
+def test_save_shortens_a_long_client_name_and_keeps_its_extension(
+    tmp_path: Path, client_name: str
+) -> None:
+    saved = Path(MediaFileStorage(tmp_path).save(b"bytes", client_name))
+    assert len(saved.name.encode()) <= 255
+    assert saved.suffix == PurePosixPath(client_name).suffix
+    assert saved.read_bytes() == b"bytes"
+
+
+def test_save_cuts_a_name_whose_extension_alone_is_too_long(tmp_path: Path) -> None:
+    saved = Path(MediaFileStorage(tmp_path).save(b"bytes", "clip." + "x" * 300))
+    assert len(saved.name.encode()) <= 255
+    assert saved.read_bytes() == b"bytes"
 
 
 def test_save_that_fails_part_way_leaves_no_file(
