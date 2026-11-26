@@ -28,12 +28,10 @@ export type Video = View<Schemas['VideoRead'], 'id' | 'title', 'description' | '
 
 export type Audio = View<Schemas['AudioRead'], 'id' | 'title', 'description' | 'audio_url' | 'tags'>;
 
-export interface Page<T> {
-    items: T[];
-    total: number;
-    limit: number;
-    offset: number;
-}
+// The schema spells Page[T] out once per item type (Page_BookRead_); the
+// paging fields are the same in each, so they are taken from there and only
+// the item type is left open.
+export type Page<T> = Omit<Schemas['Page_BookRead_'], 'items'> & { items: T[] };
 
 export type Role = Schemas['RoleEnum'];
 
