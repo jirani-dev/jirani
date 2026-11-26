@@ -28,6 +28,12 @@ def _jpeg_bytes(width: int, height: int) -> bytes:
     return pix.tobytes("jpeg")
 
 
+def _cmyk_jpeg_bytes(width: int, height: int) -> bytes:
+    pix = pymupdf.Pixmap(pymupdf.csCMYK, pymupdf.IRect(0, 0, width, height))
+    pix.clear_with(90)
+    return pix.tobytes("jpeg")
+
+
 def _write_epub_with_cover(
     path: Path, *, cover: bytes | None = None, href: str = "images/cover.png"
 ) -> None:
@@ -118,6 +124,27 @@ def test_epub_jpeg_cover_is_stored_as_a_real_downscaled_png(tmp_path: Path) -> N
     assert cover.read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
     pix = pymupdf.Pixmap(str(cover))
     assert (pix.width, pix.height) == (600, 900)
+
+
+def test_epub_cmyk_jpeg_cover_is_stored_as_an_rgb_png(tmp_path: Path) -> None:
+    # EPUBs made from print files often carry CMYK JPEG covers, which PNG
+    # cannot store.
+    epub = tmp_path / "cmykcover.epub"
+    _write_epub_with_cover(epub, cover=_cmyk_jpeg_bytes(40, 60), href="images/c.jpg")
+    dest = tmp_path / "covers"
+    assert CoverGenerator().generate(epub, dest) is True
+    pix = pymupdf.Pixmap(str(dest / "cmykcover.png"))
+    assert pix.colorspace is not None
+    assert pix.colorspace.n == 3
+    assert (pix.width, pix.height) == (40, 60)
+
+
+def test_unsupported_source_returns_false_and_writes_nothing(tmp_path: Path) -> None:
+    source = tmp_path / "bk0001.txt"
+    source.write_text("not a book")
+    dest = tmp_path / "covers"
+    assert CoverGenerator().generate(source, dest) is False
+    assert list(dest.iterdir()) == []
 
 
 def test_epub_cover_that_is_not_an_image_returns_false(tmp_path: Path) -> None:

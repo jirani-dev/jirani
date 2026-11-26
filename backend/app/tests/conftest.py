@@ -53,6 +53,8 @@ def fill_disk(monkeypatch: pytest.MonkeyPatch) -> Callable[[], None]:
         file = real_open(self, mode, *args, **kwargs)
         return _HalfWrittenFile(file) if set(mode) & set("wxa") else file
 
+    # CoverGenerator writes through write_new_file today. Failing Pixmap.save
+    # too means a return to MuPDF-side writes would still be caught.
     def save_half_written(self: pymupdf.Pixmap, filename: str, *args: Any) -> None:
         with open_half_written(Path(filename), "wb") as file:
             file.write(self.tobytes("png"))
