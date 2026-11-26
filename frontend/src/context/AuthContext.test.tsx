@@ -123,6 +123,18 @@ describe('AuthContext (characterization — pins frontend/AGENTS.md §Backend In
         });
     });
 
+    it('a late password change for a session without a token stores nothing', () => {
+        localStorage.setItem('auth', JSON.stringify({ username: 'u', role: 'student', first_login: true }));
+        const { result } = renderHook(() => useAuth(), { wrapper });
+        const markFromBeforeSignOut = result.current.markPasswordChanged;
+
+        act(() => result.current.logout());
+        act(() => markFromBeforeSignOut());
+
+        expect(result.current.auth).toBeNull();
+        expect(localStorage.getItem('auth')).toBeNull();
+    });
+
     it('logout drops the stored token AND calls the cookie-clearing endpoint', async () => {
         localStorage.setItem(
             'auth',

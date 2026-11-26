@@ -73,7 +73,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // that made the request, and only while that session is still the stored one.
     const markPasswordChanged = () => {
         const current = readStoredAuth();
-        if (!auth || current?.access_token !== auth.access_token) return;
+        if (!auth?.access_token || current?.access_token !== auth.access_token) return;
         store({ ...current, first_login: false });
     };
 
