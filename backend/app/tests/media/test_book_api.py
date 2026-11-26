@@ -66,6 +66,13 @@ def _patch_dirs(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     (tmp_path / "covers").mkdir()
 
 
+def _upload_into(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    # Books land in tmp_path itself. An upload also generates a cover, which
+    # would otherwise be written to the checkout's own uploads/covers.
+    monkeypatch.setattr(settings, "UPLOAD_DIR", tmp_path)
+    monkeypatch.setattr(settings, "COVER_DIR", tmp_path / "covers")
+
+
 def _admin_headers(client: TestClient, setup_paths: Path) -> dict[str, str]:
     admin_pw = setup_admin(client, setup_paths)
     token = login(client, "admin", admin_pw)["access_token"]
@@ -212,7 +219,7 @@ def test_upload_pdf_happy_path(
     tmp_path: Path,
     setup_paths: Path,
 ) -> None:
-    monkeypatch.setattr(settings, "UPLOAD_DIR", tmp_path)
+    _upload_into(monkeypatch, tmp_path)
     headers = _admin_headers(client, setup_paths)
     response = client.post(
         "/books/upload",
@@ -234,7 +241,7 @@ def test_upload_bad_magic_400_nothing_on_disk(
     tmp_path: Path,
     setup_paths: Path,
 ) -> None:
-    monkeypatch.setattr(settings, "UPLOAD_DIR", tmp_path)
+    _upload_into(monkeypatch, tmp_path)
     headers = _admin_headers(client, setup_paths)
     response = client.post(
         "/books/upload",
@@ -249,7 +256,7 @@ def test_upload_bad_magic_400_nothing_on_disk(
 def test_upload_requires_auth(
     client: TestClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    monkeypatch.setattr(settings, "UPLOAD_DIR", tmp_path)
+    _upload_into(monkeypatch, tmp_path)
     response = client.post(
         "/books/upload",
         files={"file": ("real.pdf", io.BytesIO(_make_pdf()), "application/pdf")},
@@ -265,7 +272,7 @@ def test_upload_genre_form_linked(
     tmp_path: Path,
     setup_paths: Path,
 ) -> None:
-    monkeypatch.setattr(settings, "UPLOAD_DIR", tmp_path)
+    _upload_into(monkeypatch, tmp_path)
     headers = _admin_headers(client, setup_paths)
     response = client.post(
         "/books/upload",
@@ -288,7 +295,7 @@ def test_upload_author_form_stored(
     tmp_path: Path,
     setup_paths: Path,
 ) -> None:
-    monkeypatch.setattr(settings, "UPLOAD_DIR", tmp_path)
+    _upload_into(monkeypatch, tmp_path)
     headers = _admin_headers(client, setup_paths)
     response = client.post(
         "/books/upload",
@@ -311,7 +318,7 @@ def test_upload_overlong_title_400(
     tmp_path: Path,
     setup_paths: Path,
 ) -> None:
-    monkeypatch.setattr(settings, "UPLOAD_DIR", tmp_path)
+    _upload_into(monkeypatch, tmp_path)
     headers = _admin_headers(client, setup_paths)
     response = client.post(
         "/books/upload",
@@ -773,7 +780,7 @@ def test_upload_survives_unusable_embedded_subjects(
     # The file's own "subject" metadata becomes tags. Real-world subjects are
     # full of characters a tag may not contain, and repeat themselves; neither
     # may fail the upload (it used to answer 400 and leave the file on disk).
-    monkeypatch.setattr(settings, "UPLOAD_DIR", tmp_path)
+    _upload_into(monkeypatch, tmp_path)
     headers = _admin_headers(client, setup_paths)
     doc = pymupdf.open()
     doc.new_page()
