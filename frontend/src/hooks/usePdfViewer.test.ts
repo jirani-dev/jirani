@@ -83,6 +83,20 @@ describe('usePdfViewer', () => {
         expect(canvas.width).toBe(100 * scale);
     });
 
+    // GHSA-wgrm-67xf-hhpq: with eval allowed, pdf.js 3.x runs script hidden in a
+    // crafted font. Books are uploaded by staff and opened by every reader.
+    it('never lets pdf.js evaluate code from the file', async () => {
+        serve(fakeDocument(fakePage()));
+        const { canvasRef, containerRef } = reader();
+
+        renderHook(() => usePdfViewer('bk1', containerRef, canvasRef));
+
+        await waitFor(() => expect(pdfjsLib.getDocument).toHaveBeenCalledTimes(1));
+        expect(vi.mocked(pdfjsLib.getDocument).mock.calls[0]).toEqual([
+            { data: bytes, isEvalSupported: false },
+        ]);
+    });
+
     it('reports a file pdf.js cannot open instead of spinning forever', async () => {
         vi.mocked(pdfjsLib.getDocument).mockImplementation(() =>
             loadingTask(Promise.reject(new Error('Invalid PDF structure'))),

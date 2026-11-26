@@ -65,7 +65,10 @@ export function usePdfViewer(
                 // PDF.js the raw data instead of a URL.
                 const arrayBuffer = await fetchBookFile(uid ?? '');
 
-                const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                // isEvalSupported: false closes GHSA-wgrm-67xf-hhpq, where a
+                // crafted font makes pdf.js 3.x run the file's own script in
+                // this page, which holds the reader's token.
+                const pdf = await pdfjsLib.getDocument({ data: arrayBuffer, isEvalSupported: false }).promise;
                 if (cancelled) {
                     void pdf.destroy();
                     return;
