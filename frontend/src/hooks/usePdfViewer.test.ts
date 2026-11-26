@@ -274,4 +274,49 @@ describe('usePdfViewer', () => {
         expect(firstDoc.destroy).toHaveBeenCalledTimes(1);
         expect(secondDoc.destroy).not.toHaveBeenCalled();
     });
+    it('a replaced render does not end the render that replaced it', async () => {
+        const page = fakePage();
+        const first = heldTask();
+        const second = heldTask();
+        page.render.mockImplementationOnce(() => first.task).mockImplementationOnce(() => second.task);
+        serve(fakeDocument(page));
+        const { canvasRef, containerRef } = reader();
+        const { result } = renderHook(() => usePdfViewer('bk1', containerRef, canvasRef));
+        await waitFor(() => expect(page.render).toHaveBeenCalledTimes(1));
+
+        act(() => result.current.zoom(1));
+        await waitFor(() => expect(page.render).toHaveBeenCalledTimes(2));
+
+        // The first drawing was cancelled and has settled; the second still draws.
+        expect(first.cancel).toHaveBeenCalledTimes(1);
+        expect(result.current.rendering).toBe(true);
+        act(() => result.current.goTo(2));
+        expect(result.current.currentPage).toBe(1);
+
+        await act(async () => second.finish());
+        expect(result.current.rendering).toBe(false);
+    });
+
+    it('a replaced render that wakes late leaves the newer drawing cancellable', async () => {
+        const page = fakePage();
+        const doc = fakeDocument(page);
+        const pageForFirstRender = deferred<FakePage>();
+        doc.getPage
+            .mockImplementationOnce(() => Promise.resolve(page)) // measuring page 1 to fit it
+            .mockImplementationOnce(() => pageForFirstRender.promise);
+        const second = heldTask();
+        page.render.mockImplementationOnce(() => second.task);
+        serve(doc);
+        const { canvasRef, containerRef } = reader();
+        const { result } = renderHook(() => usePdfViewer('bk1', containerRef, canvasRef));
+        await waitFor(() => expect(doc.getPage).toHaveBeenCalledTimes(2));
+
+        act(() => result.current.zoom(1));
+        await waitFor(() => expect(page.render).toHaveBeenCalledTimes(1));
+        await act(async () => pageForFirstRender.resolve(page));
+
+        act(() => result.current.zoom(1));
+        await waitFor(() => expect(page.render).toHaveBeenCalledTimes(2));
+        expect(second.cancel).toHaveBeenCalledTimes(1);
+    });
 });
