@@ -26,15 +26,19 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+// The stored session is the live one: login, logout and a 401 in the
+// transport all update it synchronously.
+const readStoredAuth = (): AuthData | null => {
+    try {
+        const stored = localStorage.getItem("auth");
+        return stored ? JSON.parse(stored) : null;
+    } catch {
+        return null;
+    }
+};
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-    const [auth, setAuth] = useState<AuthData | null>(() => {
-        try {
-            const stored = localStorage.getItem("auth");
-            return stored ? JSON.parse(stored) : null;
-        } catch {
-            return null;
-        }
-    });
+    const [auth, setAuth] = useState<AuthData | null>(readStoredAuth);
 
     const navigate = useNavigate();
 
@@ -63,8 +67,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         });
     };
 
+    // Runs when a password change finishes, which can be after its session
+    // ended: the user signed out, a 401 cleared it, or someone else signed in.
+    // Like a late 401 in the transport, the result belongs only to the session
+    // that made the request, and only while that session is still the stored one.
     const markPasswordChanged = () => {
-        if (auth) store({ ...auth, first_login: false });
+        const current = readStoredAuth();
+        if (!auth || current?.access_token !== auth.access_token) return;
+        store({ ...current, first_login: false });
     };
 
     const logout = () => {

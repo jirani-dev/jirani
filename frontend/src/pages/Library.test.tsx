@@ -1,9 +1,25 @@
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import App from '../App';
 import { AuthProvider } from '../context/AuthContext';
 import type { Book, Role } from '../types';
 import Library from './Library';
+
+// A password change the test finishes by hand, to land it after a sign-out.
+const passwordChange = vi.hoisted(() => ({ finish: null as (() => void) | null }));
+
+vi.mock('../services/api/auth', async (importOriginal) => ({
+    ...(await importOriginal<typeof import('../services/api/auth')>()),
+    changePassword: vi.fn(
+        () =>
+            new Promise<void>((resolve) => {
+                passwordChange.finish = resolve;
+            }),
+    ),
+    logout: vi.fn().mockResolvedValue(undefined),
+}));
 
 // What the three list hooks report; individual tests override single fields.
 const lists = vi.hoisted(() => ({
@@ -66,6 +82,7 @@ beforeEach(() => {
     lists.books = [];
     lists.bookTotal = 0;
     lists.booksError = null;
+    passwordChange.finish = null;
 });
 
 describe('Library role gating', () => {
@@ -142,5 +159,31 @@ describe('Library first login', () => {
         renderLibrary();
         await screen.findByText(/no books yet/i);
         expect(screen.queryByRole('dialog')).toBeNull();
+    });
+
+    it('signing out while the new password is being saved stays signed out', async () => {
+        signInAs('teacher', { first_login: true });
+        render(
+            <MemoryRouter initialEntries={['/library']}>
+                <AuthProvider>
+                    <App />
+                </AuthProvider>
+            </MemoryRouter>,
+        );
+        const user = userEvent.setup();
+
+        await user.type(await screen.findByLabelText(/temporary password/i), 'teacher123');
+        await user.type(screen.getByLabelText(/^new password \(/i), 'a-better-secret');
+        await user.type(screen.getByLabelText(/new password again/i), 'a-better-secret');
+        await user.click(screen.getByRole('button', { name: /save password/i }));
+        await user.click(screen.getByRole('button', { name: /sign out instead/i }));
+        expect(await screen.findByRole('heading', { name: /offlib llc/i })).toBeInTheDocument();
+
+        // The server accepts the new password only now, after the sign-out.
+        expect(passwordChange.finish).not.toBeNull();
+        await act(async () => passwordChange.finish?.());
+
+        expect(localStorage.getItem('auth')).toBeNull();
+        expect(screen.getByRole('heading', { name: /offlib llc/i })).toBeInTheDocument();
     });
 });

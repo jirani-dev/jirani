@@ -79,6 +79,9 @@ export const ChangePasswordModal = ({ role, onChanged, onSignOut }: ChangePasswo
                     className={`py-3.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 ${saving || !current || !next || !confirm ? "bg-[#E8E4DE] text-[#A09890] cursor-not-allowed" : "bg-[#B8922A] text-white cursor-pointer"}`}>
                     {saving ? <><Loader2 size={14} className="animate-spin" /> Saving...</> : "Save password"}
                 </button>
+                {/* Stays enabled while saving: the modal cannot be dismissed, so this is
+                    the way out of a request that hangs. A change that finishes after
+                    the sign-out is ignored (AuthContext.markPasswordChanged). */}
                 <button type="button" onClick={onSignOut}
                     className="bg-transparent border-none text-[#A09890] text-xs cursor-pointer text-center">
                     Sign out instead

@@ -72,6 +72,57 @@ describe('AuthContext (characterization — pins frontend/AGENTS.md §Backend In
         });
     });
 
+    // A password change can finish after its session has ended. The modal still
+    // holds the callback it was given when the user pressed Save.
+    it('a password change that finishes after sign-out does not sign the user back in', () => {
+        const { result } = renderHook(() => useAuth(), { wrapper });
+        act(() => result.current.login({ ...loginResponse, first_login: true }));
+        const markFromBeforeSignOut = result.current.markPasswordChanged;
+
+        act(() => result.current.logout());
+        act(() => markFromBeforeSignOut());
+
+        expect(result.current.auth).toBeNull();
+        expect(localStorage.getItem('auth')).toBeNull();
+    });
+
+    it('a password change that finishes after a 401 does not restore the session', () => {
+        const { result } = renderHook(() => useAuth(), { wrapper });
+        act(() => result.current.login({ ...loginResponse, first_login: true }));
+        const markFromBeforeExpiry = result.current.markPasswordChanged;
+
+        act(() => {
+            window.dispatchEvent(new Event(AUTH_UNAUTHORIZED_EVENT));
+        });
+        act(() => markFromBeforeExpiry());
+
+        expect(result.current.auth).toBeNull();
+        expect(localStorage.getItem('auth')).toBeNull();
+    });
+
+    it('a late password change from an earlier session leaves the current one alone', () => {
+        const { result } = renderHook(() => useAuth(), { wrapper });
+        act(() => result.current.login({ ...loginResponse, first_login: true }));
+        const markFromEarlierSession = result.current.markPasswordChanged;
+
+        act(() => result.current.logout());
+        act(() =>
+            result.current.login({
+                ...loginResponse,
+                access_token: 'tok.other',
+                username: 'baraka',
+                first_login: true,
+            }),
+        );
+        act(() => markFromEarlierSession());
+
+        expect(result.current.auth).toMatchObject({ username: 'baraka', first_login: true });
+        expect(JSON.parse(localStorage.getItem('auth') ?? 'null')).toMatchObject({
+            access_token: 'tok.other',
+            first_login: true,
+        });
+    });
+
     it('logout drops the stored token AND calls the cookie-clearing endpoint', async () => {
         localStorage.setItem(
             'auth',
