@@ -9,12 +9,16 @@ export interface AuthData {
     access_token: string;
     username: string;
     role: Role;
+    // True while the account still has the temporary password it was created
+    // (or reset) with; the library asks for a new one before anything else.
+    first_login: boolean;
 }
 
 interface AuthContextType {
     auth: AuthData | null;
     login: (data: LoginResponse) => void;
     logout: () => void;
+    markPasswordChanged: () => void;
     isAdmin: boolean;
     isTeacher: boolean;
     isGuest: boolean;
@@ -22,15 +26,19 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+// The stored session is the live one: login, logout and a 401 in the
+// transport all update it synchronously.
+const readStoredAuth = (): AuthData | null => {
+    try {
+        const stored = localStorage.getItem("auth");
+        return stored ? JSON.parse(stored) : null;
+    } catch {
+        return null;
+    }
+};
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-    const [auth, setAuth] = useState<AuthData | null>(() => {
-        try {
-            const stored = localStorage.getItem("auth");
-            return stored ? JSON.parse(stored) : null;
-        } catch {
-            return null;
-        }
-    });
+    const [auth, setAuth] = useState<AuthData | null>(readStoredAuth);
 
     const navigate = useNavigate();
 
@@ -45,14 +53,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             window.removeEventListener(AUTH_UNAUTHORIZED_EVENT, handleUnauthorized);
     }, [navigate]);
 
+    const store = (authData: AuthData) => {
+        localStorage.setItem("auth", JSON.stringify(authData));
+        setAuth(authData);
+    };
+
     const login = (data: LoginResponse) => {
-        const authData: AuthData = {
+        store({
             access_token: data.access_token,
             username: data.username,
             role: data.role,
-        };
-        localStorage.setItem("auth", JSON.stringify(authData));
-        setAuth(authData);
+            first_login: data.first_login,
+        });
+    };
+
+    // Runs when a password change finishes, which can be after its session
+    // ended: the user signed out, a 401 cleared it, or someone else signed in.
+    // Like a late 401 in the transport, the result belongs only to the session
+    // that made the request, and only while that session is still the stored one.
+    const markPasswordChanged = () => {
+        const current = readStoredAuth();
+        if (!auth?.access_token || current?.access_token !== auth.access_token) return;
+        store({ ...current, first_login: false });
     };
 
     const logout = () => {
@@ -70,7 +92,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const isGuest = !auth;
 
     return (
-        <AuthContext.Provider value={{ auth, login, logout, isAdmin, isTeacher, isGuest }}>
+        <AuthContext.Provider
+            value={{ auth, login, logout, markPasswordChanged, isAdmin, isTeacher, isGuest }}
+        >
             {children}
         </AuthContext.Provider>
     );

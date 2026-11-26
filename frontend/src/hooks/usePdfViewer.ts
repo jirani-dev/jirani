@@ -2,8 +2,11 @@
 import { useState, useEffect, useRef, useCallback, RefObject } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
 import type { PDFDocumentProxy, RenderTask } from 'pdfjs-dist';
-import { getBookReadUrl } from '../services/api/books';
-import { apiFetch } from '../services/api/client';
+import { fetchBookFile } from '../services/api/books';
+
+// pdf.js parses documents in a web worker. The worker script ships in
+// /public, so the reader needs no network beyond the library itself.
+pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 
 interface UsePdfViewerResult {
     loading: boolean;
@@ -58,16 +61,18 @@ export function usePdfViewer(
 
                 // PDF.js's getDocument(url) does its own internal fetch and
                 // never sends our Authorization header. /books/{uid}/read
-                // requires auth, so we fetch the bytes ourselves (via
-                // apiFetch) and hand PDF.js the raw data instead of a URL.
-                const res = await apiFetch(getBookReadUrl(uid ?? ''));
-                if (!res.ok) {
-                    throw new Error(`Failed to fetch book (${res.status})`);
-                }
-                const arrayBuffer = await res.arrayBuffer();
+                // requires auth, so we fetch the bytes ourselves and hand
+                // PDF.js the raw data instead of a URL.
+                const arrayBuffer = await fetchBookFile(uid ?? '');
 
-                const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-                if (cancelled) return;
+                // isEvalSupported: false closes GHSA-wgrm-67xf-hhpq, where a
+                // crafted font makes pdf.js 3.x run the file's own script in
+                // this page, which holds the reader's token.
+                const pdf = await pdfjsLib.getDocument({ data: arrayBuffer, isEvalSupported: false }).promise;
+                if (cancelled) {
+                    void pdf.destroy();
+                    return;
+                }
                 pdfRef.current = pdf;
                 setTotalPages(pdf.numPages);
                 setCurrentPage(1);
@@ -82,15 +87,28 @@ export function usePdfViewer(
         };
 
         load();
-        return () => { cancelled = true; };
+        return () => {
+            cancelled = true;
+            // Leaving the book: release the parsed document. pdf.js keeps it
+            // (and its worker-side copy) alive until destroy() is called.
+            renderTaskRef.current?.cancel();
+            renderTaskRef.current = null;
+            void pdfRef.current?.destroy();
+            pdfRef.current = null;
+        };
     }, [uid, computeFitScale]);
 
     // Recompute scale on resize / orientation change
     useEffect(() => {
         const handleResize = async () => {
-            if (!pdfRef.current) return;
-            const fitScale = await computeFitScale(pdfRef.current, currentPage);
-            setScale(fitScale);
+            const pdf = pdfRef.current;
+            if (!pdf) return;
+            try {
+                const fitScale = await computeFitScale(pdf, currentPage);
+                if (pdfRef.current === pdf) setScale(fitScale);
+            } catch {
+                // The document was closed while measuring; nothing to rescale.
+            }
         };
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
@@ -98,7 +116,11 @@ export function usePdfViewer(
 
     // Render the current page whenever page/scale changes
     useEffect(() => {
-        if (!pdfRef.current || loading || scale === null) return;
+        const pdf = pdfRef.current;
+        if (!pdf || loading || scale === null) return;
+        // Set by the cleanup when a newer render (or an unmount) supersedes
+        // this one, so a late result cannot overwrite the newer render's state.
+        let superseded = false;
 
         const render = async () => {
             if (renderTaskRef.current) {
@@ -107,7 +129,8 @@ export function usePdfViewer(
             }
             setRendering(true);
             try {
-                const page = await pdfRef.current!.getPage(currentPage);
+                const page = await pdf.getPage(currentPage);
+                if (superseded) return;
                 const viewport = page.getViewport({ scale });
                 const canvas = canvasRef.current;
                 if (!canvas) return;
@@ -120,16 +143,19 @@ export function usePdfViewer(
                 await task.promise;
             } catch (e) {
                 const err = e as { name?: string; message?: string };
-                if (err?.name !== 'RenderingCancelledException') {
+                if (!superseded && err?.name !== 'RenderingCancelledException') {
                     setError(`Failed to render page: ${err?.message || err?.name || 'Unknown error'}`);
                 }
             } finally {
-                renderTaskRef.current = null;
-                setRendering(false);
+                if (!superseded) {
+                    renderTaskRef.current = null;
+                    setRendering(false);
+                }
             }
         };
 
         render();
+        return () => { superseded = true; };
     }, [currentPage, scale, loading, canvasRef]);
 
     const goTo = useCallback((n: number) => {

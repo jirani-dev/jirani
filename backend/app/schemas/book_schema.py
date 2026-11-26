@@ -1,12 +1,19 @@
 import re
 from datetime import datetime
-from typing import Any, TypeVar
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
 
-from app.schemas.tag_schema import TagCreate
+from app.schemas.tag_schema import TagCreate, TagRead
 
-T = TypeVar("T")
+MAX_TAGS_PER_BOOK = 20
+
+
+def _reject_duplicate_tags(tags: list[TagCreate]) -> list[TagCreate]:
+    names = [tag.name.lower() for tag in tags]
+    if len(names) != len(set(names)):
+        raise ValueError("Duplicate tags are not allowed")
+    return tags
 
 
 class BookBase(BaseModel):
@@ -23,7 +30,6 @@ class BookCreate(BookBase):
     level_id: int | None = None
     genre_id: int | None = None
     file_path: str
-    cover_path: str | None = None
     tags: list[TagCreate] = []
 
 
@@ -34,6 +40,8 @@ class BookRead(BookBase):
     genre: str | None = Field(default=None, alias="genre_name")
     created_at: datetime
     metadata_: dict[str, Any] = Field(default_factory=dict, alias="metadata_")
+    # The book cards, the edit form and the tag filter are all built from this.
+    tags: list[TagRead] = []
 
     @computed_field
     def cover_url(self) -> str | None:
@@ -43,14 +51,21 @@ class BookRead(BookBase):
 
 
 class BookUpdate(BaseModel):
-    title: str | None = None
-    author: str | None = None
-    level: str | None = None
-    genre: str | None = None
-    language: str | None = None
-    tags: list[TagCreate] | None = None
-    metadata_: dict[str, Any] | None = None
-    model_config = ConfigDict(from_attributes=True, str_strip_whitespace=True)
+    # Same bounds as BookUpload: without them an over-long value reaches the
+    # database and fails there as an unmapped DataError (a 500).
+    title: str | None = Field(None, max_length=255)
+    author: str | None = Field(None, max_length=255)
+    level: str | None = Field(None, max_length=50)
+    genre: str | None = Field(None, max_length=50)
+    language: str | None = Field(None, max_length=50)
+    # None leaves the book's tags alone; an empty list removes them all.
+    tags: list[TagCreate] | None = Field(None, max_length=MAX_TAGS_PER_BOOK)
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    @field_validator("tags")
+    @classmethod
+    def validate_tags(cls, v: list[TagCreate] | None) -> list[TagCreate] | None:
+        return v if v is None else _reject_duplicate_tags(v)
 
 
 class BookUpload(BaseModel):
@@ -59,7 +74,7 @@ class BookUpload(BaseModel):
     level: str | None = Field(None, max_length=50)
     genre: str | None = Field(None, max_length=50)
     language: str | None = Field(None, max_length=50)
-    tags: list[TagCreate] = Field(default_factory=list, max_length=20)
+    tags: list[TagCreate] = Field(default_factory=list, max_length=MAX_TAGS_PER_BOOK)
 
     @field_validator("title")
     @classmethod
@@ -74,12 +89,7 @@ class BookUpload(BaseModel):
     @field_validator("tags")
     @classmethod
     def validate_tags(cls, v: list[TagCreate]) -> list[TagCreate]:
-        if len(v) > 20:
-            raise ValueError("Maximum 20 tags allowed per book")
-        tag_names = [tag.name.lower() for tag in v]
-        if len(tag_names) != len(set(tag_names)):
-            raise ValueError("Duplicate tags are not allowed")
-        return v
+        return _reject_duplicate_tags(v)
 
 
 class BookSearchCriteria(BaseModel):

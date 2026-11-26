@@ -29,9 +29,11 @@ jobs:
         with:
           python-version: "3.13"
 
+      # --locked: fail if uv.lock no longer matches pyproject.toml instead of
+      # quietly re-resolving and testing a dependency set nobody committed.
       - name: Sync dependencies
         working-directory: backend
-        run: uv sync
+        run: uv sync --locked
 
       - name: Resolve changed Python files
         id: py
@@ -45,28 +47,46 @@ jobs:
             echo "Branch-creation push — no diff basis, skipping scoped checks"
             range=""
           fi
+          # One path per line. The steps below read the list from the
+          # environment into an array: file names come from the PR, and pasted
+          # into a script a name like "$(…).py" would run as a command.
+          files=""
           if [ -n "$range" ]; then
-            files=$(git diff --name-only --relative --diff-filter=d "$range" -- '*.py' | tr '\n' ' ' || true)
-          else
-            files=""
+            files=$(git diff --name-only --relative --diff-filter=d "$range" -- '*.py' || true)
           fi
-          echo "files=$files" >> "$GITHUB_OUTPUT"
+          delimiter="EOF_$(openssl rand -hex 16)"
+          {
+            echo "files<<$delimiter"
+            if [ -n "$files" ]; then printf '%s\n' "$files"; fi
+            echo "$delimiter"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Format check (changed files)
         if: steps.py.outputs.files != ''
         working-directory: backend
-        run: uv run ruff format --check ${{ steps.py.outputs.files }}
+        env:
+          FILES: ${{ steps.py.outputs.files }}
+        run: |
+          files=(); while IFS= read -r f; do [ -n "$f" ] && files+=("$f"); done <<< "$FILES"
+          uv run ruff format --check -- "${files[@]}"
 
       - name: Lint (changed files)
         if: steps.py.outputs.files != ''
         working-directory: backend
-        run: uv run ruff check ${{ steps.py.outputs.files }}
+        env:
+          FILES: ${{ steps.py.outputs.files }}
+        run: |
+          files=(); while IFS= read -r f; do [ -n "$f" ] && files+=("$f"); done <<< "$FILES"
+          uv run ruff check -- "${files[@]}"
 
       - name: Type check (changed files)
         if: steps.py.outputs.files != ''
         working-directory: backend
+        env:
+          FILES: ${{ steps.py.outputs.files }}
         run: |
-          out="$(uv run mypy ${{ steps.py.outputs.files }} --strict || true)"
+          files=(); while IFS= read -r f; do [ -n "$f" ] && files+=("$f"); done <<< "$FILES"
+          out="$(uv run mypy --strict -- "${files[@]}" || true)"
           echo "$out"
           errfiles="$(echo "$out" | grep "error:" | cut -d: -f1 | sort -u || true)"
           if [ -z "$errfiles" ]; then
@@ -74,8 +94,8 @@ jobs:
             exit 0
           fi
           bad=""
-          for f in ${{ steps.py.outputs.files }}; do
-            if echo "$errfiles" | grep -qx "$f"; then
+          for f in "${files[@]}"; do
+            if echo "$errfiles" | grep -qxF -- "$f"; then
               bad="$bad $f"
             fi
           done
@@ -107,11 +127,20 @@ jobs:
       - name: Coverage on changed Python files
         if: steps.py.outputs.files != '' && steps.docs.outputs.docs_only != 'true'
         working-directory: backend
+        env:
+          FILES: ${{ steps.py.outputs.files }}
         run: |
+          # steps.py lists paths relative to backend/ (git diff --relative), which
+          # is also where coverage runs, so they are usable as-is. Migrations are
+          # left out: the suite builds its schema from the models and never
+          # imports them, and a report restricted to files without data fails
+          # with "No data to report".
+          include=$(printf '%s\n' "$FILES" | grep -v -e '^migrations/' -e '^$' | paste -sd, - || true)
+          if [ -z "$include" ]; then
+            echo "Only migrations changed — nothing to measure"
+            exit 0
+          fi
           uv run coverage run --branch -m pytest -q
-          # git diff lists paths relative to repo root (e.g. backend/app/...); coverage
-          # runs from working-directory backend/ and matches patterns relative to it.
-          include=$(echo "${{ steps.py.outputs.files }}" | tr ' ' ',' | sed 's|^backend/||g')
           uv run coverage report --include="$include" --fail-under=80 --show-missing
 
   frontend:
@@ -164,6 +193,24 @@ jobs:
         if: steps.fe.outputs.changed == 'true'
         working-directory: frontend
         run: npm run test
+
+      # generate-api first dumps the backend's OpenAPI document, so this job
+      # needs the backend environment too. The check fails when the committed
+      # src/api/generated no longer matches what the backend serves.
+      - uses: astral-sh/setup-uv@v5
+        if: steps.fe.outputs.changed == 'true'
+        with:
+          python-version: "3.13"
+
+      - name: Sync backend dependencies (for generate-api)
+        if: steps.fe.outputs.changed == 'true'
+        working-directory: backend
+        run: uv sync --locked
+
+      - name: API client drift
+        if: steps.fe.outputs.changed == 'true'
+        working-directory: frontend
+        run: npm run generate-api && git diff --exit-code src/api/generated
 
       - name: Build
         if: steps.fe.outputs.changed == 'true'

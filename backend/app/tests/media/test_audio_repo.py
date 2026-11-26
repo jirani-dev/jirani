@@ -38,7 +38,6 @@ def test_delete_hard_deletes(db):
 
 
 def test_delete_missing_id_raises(db):
-    # Flip of the legacy AttributeError pin: the rewritten repo raises the
-    # domain exception the service layer maps to 404.
+    # The domain exception is what the router maps to 404.
     with pytest.raises(MediaError, match="Audio not found"):
         AudioRepo(db).delete(999999)

@@ -23,9 +23,16 @@ class TagRepo:
         return len(orphan_ids)
 
     def get_all_tags(self) -> list[Tag]:
-        return list(self.db_session.scalars(select(Tag)).all())
+        return list(self.db_session.scalars(select(Tag).order_by(Tag.name)).all())
 
-    def get_or_create_by_names(self, names: list[str]) -> list[Tag]:
+    def get_or_create_by_names(
+        self, names: list[str], *, commit: bool = True
+    ) -> list[Tag]:
+        """Resolve names to tags case-insensitively, creating the missing ones.
+
+        Pass commit=False to keep new tags in the caller's transaction, so they
+        are rolled back together with whatever they were meant to be attached to.
+        """
         cleaned = [name.strip() for name in names if name.strip()]
         result: list[Tag] = []
         seen: set[str] = set()
@@ -46,5 +53,6 @@ class TagRepo:
                 self.db_session.add(tag)
                 self.db_session.flush()
             result.append(tag)
-        self.db_session.commit()
+        if commit:
+            self.db_session.commit()
         return result

@@ -4,11 +4,12 @@ from urllib.parse import quote
 
 import pytest
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 
-import app.api.audio_router as audio_router_module
 from app.config import settings
 from app.models.audio import Audio
 from app.models.tag import Tag
+from app.repositories.audio_repo import AudioRepo
 from app.tests.conftest import auth_headers, login, setup_admin
 
 
@@ -23,15 +24,11 @@ def _seed_audio(
 
 
 def _patch_audio_dir(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    # The legacy router reads settings.AUDIO_DIR at request time (single
-    # upload) and the AUDIO_DIR constant at import time (upload_multiple);
-    # the fused router+service read settings.AUDIO_DIR at request time only.
-    # Patch both; raising=False keeps this green once the legacy constant is
-    # gone. The subdir keeps pinned file-count asserts clean.
+    # A subdirectory, so the setup flow's credential files (also written under
+    # tmp_path) stay out of the file-count asserts.
     audio_dir = tmp_path / "audio"
     audio_dir.mkdir(parents=True, exist_ok=True)
     monkeypatch.setattr(settings, "AUDIO_DIR", audio_dir)
-    monkeypatch.setattr(audio_router_module, "AUDIO_DIR", audio_dir, raising=False)
 
 
 @pytest.fixture()
@@ -50,10 +47,6 @@ def test_get_audio_empty(client, auth):
 def test_get_audio_lists_remaining_track_after_repo_delete(db, client, auth):
     keep = _seed_audio(db, title="keep")
     gone = _seed_audio(db, title="gone")
-    # Deferred import: the hard-deleting repo is new in Task 3; a module-level
-    # import would break collection of this file against legacy (red-phase).
-    from app.repositories.audio_repo import AudioRepo
-
     AudioRepo(db).delete(gone.id)  # hard delete — the row itself is gone
     response = client.get("/audio/", headers=auth)
     assert response.status_code == 200
@@ -146,9 +139,7 @@ def test_upload_extensionless_rejected(client, monkeypatch, tmp_path, auth):
         headers=auth,
     )
     assert response.status_code == 400
-    # Deliberate flip (Task 3): the shared validator extracts the suffix via
-    # Path(filename).suffix — extensionless yields "", so the detail is
-    # "File type . not allowed". Legacy emitted ".song" (witnessed red).
+    # Path("song").suffix is "", hence the bare dot in the message.
     assert response.json()["detail"] == "File type . not allowed"
 
 
@@ -165,9 +156,8 @@ def test_upload_multiple_partial_commit_leaves_nothing(
         headers=auth,
     )
     assert response.status_code == 400
-    # Flip target for Task 3 (atomic batch): validate every file before the
-    # first byte is written. Legacy persisted the first file before the
-    # second failed validation (witnessed red: one row + bytes on disk).
+    # The batch is all-or-nothing: every file is validated before the first
+    # byte is written.
     db.expire_all()
     assert client.get("/audio/", headers=auth).json() == []
     assert list((tmp_path / "audio").iterdir()) == []
@@ -212,8 +202,7 @@ def test_patch_replaces_tags_and_sweeps_orphans(db, client, auth):
     row = db.scalar(select(Audio).where(Audio.id == track.id))
     assert row is not None
     assert [tag.name for tag in row.tags] == ["bass"]
-    # Flip target for Task 3 (orphan sweep): the detached tag row is swept.
-    # Legacy kept it alive (witnessed red).
+    # The tag that lost its last link is swept.
     assert db.scalar(select(Tag).where(Tag.id == old_tag_id)) is None
 
 
@@ -238,7 +227,7 @@ def test_patch_empty_tags_clears_links_and_sweeps_orphans(db, client, auth):
     row = db.scalar(select(Audio).where(Audio.id == track.id))
     assert row is not None
     assert row.tags == []
-    # orphan tag: its only link was cleared → row swept (legacy kept it — red)
+    # orphan tag: its only link was cleared → row swept
     assert db.scalar(select(Tag).where(Tag.id == tag_id)) is None
     # shared tag: still linked to the other track → survives
     assert db.scalar(select(Tag).where(Tag.name == "lesson")) is not None
@@ -284,8 +273,6 @@ def test_delete_track_deletes_via_api(db, client, monkeypatch, tmp_path, auth):
     audio_file.write_bytes(b"\x00\x01\x02\x03" * 100)
     track = _seed_audio(db, file_path=str(audio_file))
     response = client.delete(f"/audio/{track.id}", headers=auth)
-    # Flip target for Task 3 (hard delete + 204): legacy returned 200 with the
-    # raw serialized row and soft-deleted (witnessed red).
     assert response.status_code == 204
     assert response.content == b""
     db.expire_all()
@@ -295,8 +282,6 @@ def test_delete_track_deletes_via_api(db, client, monkeypatch, tmp_path, auth):
 
 
 def test_delete_missing_track_404(client, auth):
-    # Flip target for Task 3 (404): legacy dereferenced None.deleted_at and the
-    # harness re-raised the server AttributeError (witnessed red).
     response = client.delete("/audio/999999", headers=auth)
     assert response.status_code == 404
     assert response.json()["detail"] == "Audio not found"
@@ -309,8 +294,7 @@ def test_stream_serves_x_accel_204(db, client, monkeypatch, tmp_path, auth):
     audio_file.write_bytes(file_bytes)
     track = _seed_audio(db, file_path=str(audio_file))
     response = client.get(f"/audio/stream/{track.id}", headers=auth)
-    # Flip target for Task 3 (X-Accel): legacy streamed the bytes with a 200
-    # body (witnessed red).
+    # nginx serves the bytes; the API only answers with the internal redirect.
     assert response.status_code == 204
     assert response.content == b""
     assert response.headers["X-Accel-Redirect"] == f"/media/audio/{quote('clip.mp3')}"
@@ -325,8 +309,6 @@ def test_stream_missing_track_404(client, auth):
 
 
 def test_stream_deleted_track_404(db, client, monkeypatch, tmp_path, auth):
-    # Replaces the soft-deleted-still-streams quirk pin: the column (and the
-    # row) die with the rewrite, so a deleted id is simply a missing one.
     _patch_audio_dir(monkeypatch, tmp_path)
     audio_file = tmp_path / "audio" / "clip.mp3"
     audio_file.write_bytes(b"\xff\xfbID3" + b"\x00" * 100)
@@ -340,8 +322,6 @@ def test_stream_missing_file_404(db, client, monkeypatch, tmp_path, auth):
     _patch_audio_dir(monkeypatch, tmp_path)
     track = _seed_audio(db, file_path=str(tmp_path / "audio" / "gone.mp3"))
     response = client.get(f"/audio/stream/{track.id}", headers=auth)
-    # Flip target for Task 3 (404): legacy open()'d inside the generator and
-    # the harness re-raised FileNotFoundError (witnessed red).
     assert response.status_code == 404
 
 
@@ -439,3 +419,41 @@ def test_all_audio_endpoints_require_auth(
     track = _seed_audio(db, file_path=str(tmp_path / "audio" / "clip.mp3"))
     response = getattr(client, method)(path.format(id=track.id), **kwargs)
     assert response.status_code == 401
+
+
+def test_upload_that_fails_to_save_leaves_no_files(
+    db, client, monkeypatch, tmp_path, auth
+):
+    _patch_audio_dir(monkeypatch, tmp_path)
+
+    def refuse(self, audio_create, *, tags=None):
+        raise IntegrityError("INSERT", {}, Exception("simulated"))
+
+    monkeypatch.setattr(AudioRepo, "create", refuse)
+    response = client.post(
+        "/audio/upload",
+        files={"file": ("song.mp3", b"bytes", "audio/mpeg")},
+        data={"tags": "lesson"},
+        headers=auth,
+    )
+    assert response.status_code == 400
+    assert list((tmp_path / "audio").iterdir()) == []
+    db.expire_all()
+    # The tag was created in the same transaction as the row, so it is gone too.
+    assert db.scalar(select(func.count()).select_from(Tag)) == 0
+
+
+def test_patch_blank_title_keeps_title(db, client, auth):
+    track = _seed_audio(db, title="Keep")
+    response = client.patch(f"/audio/{track.id}", params={"title": "  "}, headers=auth)
+    assert response.status_code == 200
+    assert response.json()["title"] == "Keep"
+
+
+def test_list_order_is_stable_across_updates(db, client, auth):
+    first = _seed_audio(db, title="first")
+    second = _seed_audio(db, title="second")
+    # An UPDATE moves the row within the table; the listing must not follow it.
+    client.patch(f"/audio/{first.id}", params={"description": "edited"}, headers=auth)
+    listed = client.get("/audio/", headers=auth).json()
+    assert [track["id"] for track in listed] == [first.id, second.id]

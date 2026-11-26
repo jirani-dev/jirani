@@ -1,9 +1,6 @@
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-
-vi.mock('pdfjs-dist', () => ({ GlobalWorkerOptions: {} }));
-
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { searchBooks } from './books';
 
 const server = setupServer();

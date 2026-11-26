@@ -35,15 +35,23 @@ class AudioService:
         self, file_bytes: bytes, filename: str, tag_names: list[str]
     ) -> AudioRead:
         validate_media(filename, allowed=ALLOWED_AUDIO_EXTENSIONS)
-        saved_path = self.storage.save(file_bytes, Path(filename).name)
-        track = self.audio_repo.create(
-            AudioCreate(
-                title=Path(filename).stem, description=None, file_path=saved_path
+        saved_path = self.storage.save(file_bytes, filename)
+        try:
+            # Tags join the row's transaction (commit=False), so the track and
+            # its tags are stored together or not at all.
+            tags = self.tag_repo.get_or_create_by_names(tag_names, commit=False)
+            track = self.audio_repo.create(
+                AudioCreate(
+                    title=Path(filename).stem, description=None, file_path=saved_path
+                ),
+                tags=tags,
             )
-        )
-        track.tags = list(self.tag_repo.get_or_create_by_names(tag_names))
-        self.db.commit()
-        self.db.refresh(track)
+        except Exception:
+            # A rejected upload must leave nothing behind, in the database or
+            # on disk.
+            self.db.rollback()
+            self.storage.delete(saved_path)
+            raise
         return AudioRead.model_validate(track)
 
     def upload_multiple(self, files: list[tuple[bytes, str]]) -> list[AudioRead]:
@@ -65,8 +73,9 @@ class AudioService:
         track = self.audio_repo.get_by_id(audio_id)
         if track is None:
             raise MediaNotFound("Audio not found")
-        if title is not None:
-            track.title = title
+        # A blank title means "keep the current one": title is required.
+        if title is not None and title.strip():
+            track.title = title.strip()
         if description is not None:
             track.description = description
         if tag_names is not None:
@@ -81,8 +90,10 @@ class AudioService:
         track = self.audio_repo.get_by_id(audio_id)
         if track is None:
             raise MediaNotFound("Audio not found")
-        self.storage.delete(track.file_path)
+        file_path = track.file_path
+        # Row first: if this fails, the record still points at a real file.
         self.audio_repo.delete(audio_id)
+        self.storage.delete(file_path)
 
     def resolve_stream(self, audio_id: int) -> tuple[Path, str]:
         track = self.audio_repo.get_by_id(audio_id)

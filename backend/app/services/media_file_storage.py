@@ -1,7 +1,24 @@
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from uuid import uuid4
 
 from app.services.media_errors import MediaNotFound
+from app.services.new_file import write_new_file
+
+# A stored name is "<uuid>_<client name>", and most filesystems allow 255
+# bytes in one file name. The client's part is cut well inside what is left.
+_MAX_CLIENT_NAME_BYTES = 150
+
+
+def _shortened(name: str) -> str:
+    """Cut ``name`` to _MAX_CLIENT_NAME_BYTES of UTF-8, keeping its extension."""
+    if len(name.encode()) <= _MAX_CLIENT_NAME_BYTES:
+        return name
+    suffix = PurePosixPath(name).suffix
+    room = _MAX_CLIENT_NAME_BYTES - len(suffix.encode())
+    if room <= 0:
+        return name.encode()[:_MAX_CLIENT_NAME_BYTES].decode(errors="ignore")
+    stem = name.removesuffix(suffix).encode()[:room].decode(errors="ignore")
+    return stem + suffix
 
 
 class MediaFileStorage:
@@ -9,10 +26,15 @@ class MediaFileStorage:
         self.save_dir = save_dir
 
     def save(self, file_bytes: bytes, filename: str) -> str:
+        # `filename` is whatever the client sent. Keep only its last component
+        # (PureWindowsPath splits on both "/" and "\"): a name such as
+        # "../../x.mp4" would otherwise be written outside save_dir, and a
+        # nested one could never be streamed, because the X-Accel path is built
+        # from the bare file name.
+        name = _shortened(PureWindowsPath(filename).name or "upload")
         self.save_dir.mkdir(parents=True, exist_ok=True)
-        target = self.save_dir / f"{uuid4()}_{filename}"
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_bytes(file_bytes)
+        target = self.save_dir / f"{uuid4()}_{name}"
+        write_new_file(target, file_bytes)
         return str(target)
 
     def resolve(self, path: str) -> Path:

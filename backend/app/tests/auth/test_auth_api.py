@@ -1,10 +1,14 @@
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
 
+import pytest
 from fastapi.testclient import TestClient
+from jose import jwt
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.models.account import Account
 from app.tests.conftest import auth_headers, login, setup_admin
 
@@ -563,3 +567,96 @@ def test_reset_missing_account_is_404(client: TestClient, setup_paths: Path) -> 
         "/auth/reset-password", json={"account_id": 3}, headers=auth_headers(token)
     )
     assert response.status_code == 404, response.text
+
+
+def test_token_and_cookie_share_the_configured_lifetime(
+    client: TestClient, setup_paths: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The cookie carries the JWT for native media tags. They used to be timed
+    # by two unrelated literals while the setting itself was read by nobody.
+    monkeypatch.setattr(settings, "ACCESS_TOKEN_EXPIRE_MINUTES", 7)
+    admin_pw = setup_admin(client, setup_paths)
+
+    response = client.post(
+        "/auth/token", json={"username": "admin", "password": admin_pw}
+    )
+
+    assert response.status_code == 200, response.text
+    assert "Max-Age=420" in response.headers["set-cookie"]
+    claims = jwt.decode(
+        response.json()["access_token"],
+        settings.SECRET_KEY,
+        algorithms=[settings.ALGORITHM],
+    )
+    remaining = claims["exp"] - datetime.now(UTC).timestamp()
+    assert 400 < remaining <= 420
+
+
+def test_inactive_account_can_neither_log_in_nor_use_its_token(
+    client: TestClient, setup_paths: Path, db: Session
+) -> None:
+    admin_pw = setup_admin(client, setup_paths)
+    admin_token = login(client, "admin", admin_pw)["access_token"]
+    ghost_pw = _create_teacher(client, admin_token, "ghost")
+    ghost_token = login(client, "ghost", ghost_pw)["access_token"]
+    ghost_id = _account_id(client, admin_token, "ghost")
+
+    account = db.get(Account, ghost_id)
+    assert account is not None
+    account.is_active = False
+    db.commit()
+    client.cookies.clear()
+
+    relogin = client.post(
+        "/auth/token", json={"username": "ghost", "password": ghost_pw}
+    )
+    assert relogin.status_code == 401, relogin.text
+    me = client.get("/auth/me", headers=auth_headers(ghost_token))
+    assert me.status_code == 401, me.text
+
+
+def test_change_password_to_the_current_password_is_400(
+    client: TestClient, setup_paths: Path
+) -> None:
+    # Otherwise "changing" the temporary password to itself would clear
+    # first_login without replacing the credential.
+    admin_pwd = setup_admin(client, setup_paths)
+    token = login(client, "admin", admin_pwd)["access_token"]
+    student = _create_students(client, token, 1, "stu")[0]
+    student_token = login(client, student["username"], student["password"])[
+        "access_token"
+    ]
+
+    response = client.post(
+        "/auth/change-password",
+        json={
+            "old_password": student["password"],
+            "new_password": student["password"],
+        },
+        headers=auth_headers(student_token),
+    )
+
+    assert response.status_code == 400, response.text
+    me = client.get("/auth/me", headers=auth_headers(student_token))
+    assert me.json()["first_login"] is True
+
+
+def test_reset_password_body_is_message_and_new_password(
+    client: TestClient, setup_paths: Path
+) -> None:
+    admin_pw = setup_admin(client, setup_paths)
+    token = login(client, "admin", admin_pw)["access_token"]
+    student = _create_students(client, token, 1, "victim")[0]
+    victim_id = _account_id(client, token, student["username"])
+
+    response = client.post(
+        "/auth/reset-password",
+        json={"account_id": victim_id},
+        headers=auth_headers(token),
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json() == {
+        "message": f"Password reset for {student['username']}",
+        "new_password": "student123",
+    }

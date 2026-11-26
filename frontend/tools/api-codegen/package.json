@@ -1,0 +1,14 @@
+{
+  "name": "jirani-api-codegen",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Generates src/api/generated/schema.d.ts. Kept apart from the app because openapi-typescript needs TypeScript 5 and the app is on TypeScript 7.",
+  "type": "module",
+  "scripts": {
+    "generate": "openapi-typescript ../../src/api/generated/openapi.json -o ../../src/api/generated/schema.d.ts"
+  },
+  "devDependencies": {
+    "openapi-typescript": "^7.13.0",
+    "typescript": "^5.9.3"
+  }
+}

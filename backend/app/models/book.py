@@ -50,7 +50,7 @@ class Book(TimestampMixin, Base):
         ForeignKey("genres.id", ondelete="SET NULL"), nullable=True
     )
     language: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
-    cover_path: Mapped[str] = mapped_column(String(255), nullable=True)
+    cover_path: Mapped[str | None] = mapped_column(String(255), nullable=True)
     file_path: Mapped[str] = mapped_column(String(255), nullable=False)
     extension: Mapped[str] = mapped_column(String(100), nullable=False)
     metadata_: Mapped[dict[str, Any]] = mapped_column(

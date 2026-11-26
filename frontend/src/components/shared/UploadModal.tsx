@@ -29,34 +29,37 @@ export const UploadModal = ({ type, onClose, onSuccess }: UploadModalProps) => {
     const removeFile = (i: number) => setFiles(prev => prev.filter((_, idx) => idx !== i));
     const acceptType = type === 'book' ? '.pdf,.epub' : type === 'audio' ? '.mp3,.wav,.ogg,.m4a,.aac,.flac' : 'video/*';
 
+    const uploadOne = (file: File): Promise<unknown> => {
+        if (type === 'book') return booksApi.uploadBook(file, { tags });
+        if (type === 'audio') return audioApi.uploadAudio(file, tags);
+        return videosApi.uploadVideo(file, tags);
+    };
+
+    // One request per file, for every kind: the tags apply to each file, a
+    // large batch is not one request against the server's body-size limit, and
+    // a failure costs only the file it happened to.
     const upload = async () => {
         if (files.length === 0) { setError('No files selected.'); return; }
-        const [first] = files;
-        if (!first) return; // unreachable after the length guard; keeps noUncheckedIndexedAccess honest
         setLoading(true); setError('');
-        try {
-            if (type === 'book') {
-                await booksApi.uploadBooks(files, { tags });
-            } else if (type === 'audio') {
-                if (files.length === 1) {
-                    await audioApi.uploadAudio(first, tags);
-                } else {
-                    await audioApi.uploadAudioTracks(files);
-                }
-            } else {
-                if (files.length === 1) {
-                    await videosApi.uploadVideo(first, tags);
-                } else {
-                    await videosApi.uploadVideos(files);
-                }
+        const failed: File[] = [];
+        let firstFailure = '';
+        for (const file of files) {
+            try {
+                await uploadOne(file);
+            } catch (e) {
+                failed.push(file);
+                firstFailure ||= (e as Error).message || 'Upload failed.';
             }
-            onSuccess();
-            onClose();
-        } catch (e) {
-            setError((e as Error).message || 'Upload failed.');
-        } finally {
-            setLoading(false);
         }
+        setLoading(false);
+        if (failed.length < files.length) onSuccess();
+        if (failed.length === 0) { onClose(); return; }
+        // Keep only what failed selected, so a retry cannot store the
+        // successful files a second time.
+        setFiles(failed);
+        setError(files.length === 1
+            ? firstFailure
+            : `${failed.length} of ${files.length} files were not uploaded: ${firstFailure}`);
     };
 
     const TabIcon = type === 'book' ? BookOpen : type === 'audio' ? Music : Film;

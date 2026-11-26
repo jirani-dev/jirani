@@ -1,49 +1,38 @@
 // src/types.ts
-export interface Tag {
-    id: number | string;
-    name: string;
-}
+// Every shape here is taken from the generated API schema, so a field the
+// backend renames or removes stops compiling instead of failing at runtime.
+// List responses and fixtures often carry only part of a record, which is why
+// the entity types name the fields the UI needs rather than the whole schema.
+import type { components } from './api/generated/schema';
 
-export interface Book {
-    uid: string;
-    title: string;
-    extension: string;
-    cover_url?: string | null;
-    author?: string | null;
-    level?: string | null;
-    genre?: string | null;
-    language?: string | null;
-    tags?: Tag[];
-}
+type Schemas = components['schemas'];
 
-export interface Video {
-    id: number | string;
-    title: string;
-    description?: string | null;
-    tags?: Tag[];
-}
+// The fields in `Required` exactly as the schema has them, plus the fields in
+// `Optional` made optional.
+type View<T, Required extends keyof T, Optional extends keyof T> =
+    Pick<T, Required> & Partial<Pick<T, Optional>>;
 
-export interface Audio {
-    id: number | string;
-    title: string;
-    description?: string | null;
-    audio_url?: string;
-    tags?: Tag[];
-}
+export type Tag = Schemas['TagRead'];
 
-export interface Page<T> {
-    items: T[];
-    total: number;
-    limit: number;
-    offset: number;
-}
+// BookRead serialises author / level / genre under their alias names:
+// author_name / level_name / genre_name.
+export type Book = View<
+    Schemas['BookRead'],
+    'uid' | 'title' | 'extension',
+    'cover_url' | 'author_name' | 'level_name' | 'genre_name' | 'language' | 'tags'
+>;
 
-export type Role = "admin" | "teacher" | "student";
+// poster_url is a still frame extracted at upload; null when the server has
+// no ffmpeg.
+export type Video = View<Schemas['VideoRead'], 'id' | 'title', 'description' | 'poster_url' | 'tags'>;
 
-export interface LoginResponse {
-    access_token: string;
-    token_type: string;
-    username: string;
-    role: Role;
-    first_login: boolean;
-}
+export type Audio = View<Schemas['AudioRead'], 'id' | 'title', 'description' | 'audio_url' | 'tags'>;
+
+// The schema spells Page[T] out once per item type (Page_BookRead_); the
+// paging fields are the same in each, so they are taken from there and only
+// the item type is left open.
+export type Page<T> = Omit<Schemas['Page_BookRead_'], 'items'> & { items: T[] };
+
+export type Role = Schemas['RoleEnum'];
+
+export type LoginResponse = Schemas['TokenResponse'];

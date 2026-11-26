@@ -48,7 +48,7 @@ export const PdfCanvas = ({
             {loading && (
                 <div className="flex items-center gap-2.5 text-[#666] mt-20">
                     <Loader2 size={20} className="animate-spin" />
-                    <span className="font-mono text-sm">Loading book�</span>
+                    <span className="font-mono text-sm">Loading book…</span>
                 </div>
             )}
             {error && (

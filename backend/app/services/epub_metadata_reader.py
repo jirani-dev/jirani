@@ -19,9 +19,8 @@ class BookMetadata:
 class EpubMetadataReader:
     def read(self, path: Path) -> BookMetadata | None:
         try:
-            doc = pymupdf.open(str(path))  # type: ignore[no-untyped-call]
-            meta = doc.metadata or {}
-            doc.close()  # type: ignore[no-untyped-call]
+            with pymupdf.open(str(path)) as doc:  # type: ignore[no-untyped-call]
+                meta = doc.metadata or {}
         except (RuntimeError, ValueError, OSError):
             logger.warning("Failed to read EPUB metadata from %s", path, exc_info=True)
             return None

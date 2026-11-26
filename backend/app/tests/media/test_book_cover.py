@@ -1,4 +1,5 @@
 import zipfile
+from collections.abc import Callable
 from pathlib import Path
 
 import pymupdf
@@ -21,7 +22,21 @@ def _png_bytes() -> bytes:
     return pix.tobytes("png")
 
 
-def _write_epub_with_cover(path: Path) -> None:
+def _jpeg_bytes(width: int, height: int) -> bytes:
+    pix = pymupdf.Pixmap(pymupdf.csRGB, pymupdf.IRect(0, 0, width, height))
+    pix.clear_with(128)
+    return pix.tobytes("jpeg")
+
+
+def _cmyk_jpeg_bytes(width: int, height: int) -> bytes:
+    pix = pymupdf.Pixmap(pymupdf.csCMYK, pymupdf.IRect(0, 0, width, height))
+    pix.clear_with(90)
+    return pix.tobytes("jpeg")
+
+
+def _write_epub_with_cover(
+    path: Path, *, cover: bytes | None = None, href: str = "images/cover.png"
+) -> None:
     container = (
         '<?xml version="1.0"?>'
         '<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">'  # noqa: E501
@@ -35,7 +50,7 @@ def _write_epub_with_cover(path: Path) -> None:
         '<meta name="cover" content="cover-img"/>'
         "<dc:title>Covered</dc:title></metadata>"
         "<manifest>"
-        '<item id="cover-img" href="images/cover.png" media-type="image/png"/>'
+        f'<item id="cover-img" href="{href}" media-type="image/png"/>'
         '<item id="ch1" href="ch1.xhtml" media-type="application/xhtml+xml"/>'
         "</manifest>"
         '<spine><itemref idref="ch1"/></spine></package>'
@@ -44,7 +59,7 @@ def _write_epub_with_cover(path: Path) -> None:
         z.writestr("mimetype", "application/epub+zip", compress_type=zipfile.ZIP_STORED)
         z.writestr("META-INF/container.xml", container)
         z.writestr("OEBPS/content.opf", opf)
-        z.writestr("OEBPS/images/cover.png", _png_bytes())
+        z.writestr(f"OEBPS/{href}", cover if cover is not None else _png_bytes())
         z.writestr("OEBPS/ch1.xhtml", "<html><body>hi</body></html>")
 
 
@@ -98,6 +113,49 @@ def test_epub_with_declared_cover_returns_true(tmp_path: Path) -> None:
     assert (dest / "covered.png").exists()
 
 
+def test_epub_jpeg_cover_is_stored_as_a_real_downscaled_png(tmp_path: Path) -> None:
+    # The cover file is always named .png, and EPUB covers are mostly large
+    # JPEGs; the raw bytes used to be written under that name untouched.
+    epub = tmp_path / "jpegcover.epub"
+    _write_epub_with_cover(epub, cover=_jpeg_bytes(1600, 2400), href="images/c.jpg")
+    dest = tmp_path / "covers"
+    assert CoverGenerator().generate(epub, dest) is True
+    cover = dest / "jpegcover.png"
+    assert cover.read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
+    pix = pymupdf.Pixmap(str(cover))
+    assert (pix.width, pix.height) == (600, 900)
+
+
+def test_epub_cmyk_jpeg_cover_is_stored_as_an_rgb_png(tmp_path: Path) -> None:
+    # EPUBs made from print files often carry CMYK JPEG covers, which PNG
+    # cannot store.
+    epub = tmp_path / "cmykcover.epub"
+    _write_epub_with_cover(epub, cover=_cmyk_jpeg_bytes(40, 60), href="images/c.jpg")
+    dest = tmp_path / "covers"
+    assert CoverGenerator().generate(epub, dest) is True
+    pix = pymupdf.Pixmap(str(dest / "cmykcover.png"))
+    assert pix.colorspace is not None
+    assert pix.colorspace.n == 3
+    assert (pix.width, pix.height) == (40, 60)
+
+
+def test_unsupported_source_returns_false_and_writes_nothing(tmp_path: Path) -> None:
+    source = tmp_path / "bk0001.txt"
+    source.write_text("not a book")
+    dest = tmp_path / "covers"
+    assert CoverGenerator().generate(source, dest) is False
+    assert list(dest.iterdir()) == []
+
+
+def test_epub_cover_that_is_not_an_image_returns_false(tmp_path: Path) -> None:
+    epub = tmp_path / "svgcover.epub"
+    svg = b'<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>'
+    _write_epub_with_cover(epub, cover=svg, href="images/cover.svg")
+    dest = tmp_path / "covers"
+    assert CoverGenerator().generate(epub, dest) is False
+    assert list(dest.iterdir()) == []
+
+
 def test_epub_without_images_returns_false(tmp_path: Path) -> None:
     epub = tmp_path / "plain.epub"
     _write_minimal_epub(epub)
@@ -113,5 +171,22 @@ def test_oversized_cover_rejected(
     source = tmp_path / "bk0001.pdf"
     _write_real_pdf(source)
     dest = tmp_path / "covers"
+    assert CoverGenerator().generate(source, dest) is False
+    assert list(dest.iterdir()) == []
+
+
+@pytest.mark.parametrize("kind", ["pdf", "epub"])
+def test_a_cover_write_that_fails_part_way_leaves_no_file(
+    kind: str, tmp_path: Path, fill_disk: Callable[[], None]
+) -> None:
+    # generate() reports a failure as False, so its caller never learns the
+    # name of a half-written PNG and cannot remove it; generate() must.
+    source = tmp_path / f"bk0001.{kind}"
+    if kind == "pdf":
+        _write_real_pdf(source)
+    else:
+        _write_epub_with_cover(source)
+    dest = tmp_path / "covers"
+    fill_disk()
     assert CoverGenerator().generate(source, dest) is False
     assert list(dest.iterdir()) == []

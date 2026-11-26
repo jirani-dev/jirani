@@ -57,6 +57,20 @@ describe('ApiError.fromResponse', () => {
         expect(err.message).toBe('Server error');
     });
 
+    it('explains a 413, which nginx answers with HTML before the API runs', async () => {
+        server.use(
+            http.post('*/probe', () =>
+                new HttpResponse('<html><body>413 Request Entity Too Large</body></html>', { status: 413 }),
+            ),
+        );
+
+        const res = await apiFetch('/probe', { method: 'POST' });
+        const err = await ApiError.fromResponse(res, 'Upload failed');
+
+        expect(err.status).toBe(413);
+        expect(err.message).toBe('This file is larger than the server accepts.');
+    });
+
     it('falls back on a blank detail', async () => {
         server.use(
             http.get('*/probe', () =>

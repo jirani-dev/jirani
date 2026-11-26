@@ -26,12 +26,15 @@ Works on macOS, Linux (WSL), and Windows. Tests need a running Docker daemon —
 ## Run with Docker
 
 ```bash
+(cd frontend && npm install && npm run build)   # nginx serves frontend/dist; nothing else builds it
 docker compose up -d --build    # nginx on :80 (the only published HTTP port), API at /api/*, Postgres on :5432
 docker compose down             # stop
 docker compose down -v          # stop and remove the database volume
 ```
 
-The backend image is **baked** — only `./uploads` is bind-mounted. After code changes: `docker compose build backend && docker compose up -d backend`.
+On a new installation, open `http://<host>/setup` once: it creates the admin account and shows its credentials a single time.
+
+The backend image is **baked** — only `./uploads` is bind-mounted. After code changes: `docker compose build backend && docker compose up -d backend`. After frontend changes: `npm run build` in `frontend/` (nginx reads `frontend/dist` directly; no restart needed).
 
 ## Run locally (without the backend container)
 
@@ -129,7 +132,7 @@ Alembic manages the schema, and it is applied at container startup (`alembic upg
 
 nginx serves media. Protected streams use nginx's internal X-Accel mechanism — never expose `/media/` publicly. Uploads are written to `settings.AUDIO_DIR` / `UPLOAD_DIR` / `COVER_DIR` / `VIDEO_DIR`, all anchored to `backend/`.
 
-Deploy is manual, after merge: `docker compose up -d --build` on the machine. The pipeline deliberately does not deploy for you.
+Deploy is manual, after merge, on the machine: rebuild the SPA (`cd frontend && npm install && npm run build`), then `docker compose up -d --build`. The pipeline deliberately does not deploy for you.
 
 ## Troubleshooting
 

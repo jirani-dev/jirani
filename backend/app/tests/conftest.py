@@ -1,15 +1,69 @@
+import errno
 import json
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from pathlib import Path
-from types import ModuleType
-from typing import Any, cast
+from types import ModuleType, TracebackType
+from typing import IO, Any, cast
 
+import pymupdf
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 DBEnv = tuple[FastAPI, ModuleType]
+
+
+class _HalfWrittenFile:
+    """A file that stores half of what it is given and then fails, as on a
+    disk that fills up during the write."""
+
+    def __init__(self, file: IO[bytes]) -> None:
+        self._file = file
+
+    def write(self, data: bytes) -> int:
+        self._file.write(bytes(data)[: len(data) // 2])
+        self._file.flush()
+        raise OSError(errno.ENOSPC, "No space left on device")
+
+    def close(self) -> None:
+        self._file.close()
+
+    def __enter__(self) -> "_HalfWrittenFile":
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        tb: TracebackType | None,
+    ) -> None:
+        self.close()
+
+
+@pytest.fixture()
+def fill_disk(monkeypatch: pytest.MonkeyPatch) -> Callable[[], None]:
+    """Returns a switch: once called, every file the app writes, through Python
+    or through MuPDF's Pixmap.save, gets half its bytes and then fails."""
+    real_open = Path.open
+
+    def open_half_written(
+        self: Path, mode: str = "r", *args: Any, **kwargs: Any
+    ) -> Any:
+        file = real_open(self, mode, *args, **kwargs)
+        return _HalfWrittenFile(file) if set(mode) & set("wxa") else file
+
+    # CoverGenerator writes through write_new_file today. Failing Pixmap.save
+    # too means a return to MuPDF-side writes would still be caught.
+    def save_half_written(self: pymupdf.Pixmap, filename: str, *args: Any) -> None:
+        with open_half_written(Path(filename), "wb") as file:
+            file.write(self.tobytes("png"))
+
+    def switch_on() -> None:
+        monkeypatch.setattr(Path, "open", open_half_written)
+        monkeypatch.setattr(pymupdf.Pixmap, "save", save_half_written)
+
+    return switch_on
 
 
 @pytest.fixture(scope="session")

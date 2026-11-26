@@ -17,7 +17,6 @@ from app.schemas import (
 from app.services.auth_errors import UserNotFound
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-ACCESS_TOKEN_EXPIRE_MINUTES = 120
 
 
 class AuthService:
@@ -28,47 +27,35 @@ class AuthService:
     def validate_credentials(
         role: RoleEnum, password: str, context: str = "create"
     ) -> None:
-        if context == "create" and role == RoleEnum.student:
-            pass
-        elif context == "self_change" and role == RoleEnum.student:
-            if len(password) < 4:
+        if context == "reset":
+            return
+        if context not in ("create", "self_change"):
+            raise ValueError("Invalid role or context for password validation.")
+        if role == RoleEnum.student:
+            if context == "self_change" and len(password) < 4:
                 raise ValueError(
                     "Password must be at least 4 characters long for students."
                 )
-        elif (
-            context == "create"
-            and role in [RoleEnum.teacher, RoleEnum.admin]
-            or context == "self_change"
-            and role in [RoleEnum.teacher, RoleEnum.admin]
-        ):
-            if len(password) < 8:
-                raise ValueError(
-                    "Password must be at least 8 characters "
-                    "long for teachers and admins."
-                )
-        elif context == "reset":
-            pass
-        else:
-            raise ValueError("Invalid role or context for password validation.")
+        elif len(password) < 8:
+            raise ValueError(
+                "Password must be at least 8 characters long for teachers and admins."
+            )
 
     @staticmethod
     def verify_password(plain_password: str, hashed_password: str) -> bool:
-        if pwd_context.verify(plain_password, hashed_password):
-            return True
-        return False
+        return bool(pwd_context.verify(plain_password, hashed_password))
 
     @staticmethod
     def get_password_hash(password: str) -> str:
-        result = pwd_context.hash(password)
-        assert isinstance(result, str)
-        return result
+        hashed: str = pwd_context.hash(password)
+        return hashed
 
     def get_user_by_username(self, username: str) -> Account | None:
         return self.auth_repo.get_by_username(username)
 
     def authenticate_user(self, username: str, password: str) -> Account | None:
         account = self.auth_repo.get_by_username(username)
-        if not account:
+        if not account or not account.is_active:
             return None
         if not self.verify_password(password, account.hashed_password):
             return None
@@ -109,20 +96,25 @@ class AuthService:
         user = self.get_user_by_username(username)
         if not user:
             raise ValueError(f"User '{username}' not found.")
-        user.hashed_password = self.get_password_hash(new_password)
-        self.auth_repo.change_password(user, user.hashed_password)
-        return user
+        # Changing to the password already in use would clear first_login
+        # without replacing the temporary credential.
+        if self.verify_password(new_password, user.hashed_password):
+            raise ValueError("New password must be different from the current one.")
+        return self.auth_repo.change_password(
+            user, self.get_password_hash(new_password)
+        )
 
     @staticmethod
     def create_access_token(data: dict[str, Any]) -> str:
         to_encode = data.copy()
-        expire = datetime.now(UTC) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        expire = datetime.now(UTC) + timedelta(
+            minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
+        )
         to_encode.update({"exp": expire})
-        result = jwt.encode(
+        token: str = jwt.encode(
             to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM
         )
-        assert isinstance(result, str)
-        return result
+        return token
 
     @staticmethod
     def create_token_for_user(account: Account) -> str:
@@ -136,21 +128,22 @@ class AuthService:
     def reset_password(
         self, account_id: int, user_role: RoleEnum
     ) -> tuple[Account, str]:
+        if user_role not in (RoleEnum.teacher, RoleEnum.admin):
+            raise PermissionError("Only teachers and admins can reset passwords.")
         user = self.auth_repo.get_by_id(account_id)
         if not user:
             raise UserNotFound(f"User with ID '{account_id}' not found.")
-        if user.role != RoleEnum.student and user.role != RoleEnum.teacher:
-            raise PermissionError("You cannot reset password for admin account.")
         if user.role == RoleEnum.student:
             password = settings.STUDENT_DEFAULT_PASSWORD
-            hashed_password = self.get_password_hash(password)
-        if user.role == RoleEnum.teacher and user_role == RoleEnum.teacher:
-            raise PermissionError("You cannot reset other teachers' passwords.")
-        elif user.role == RoleEnum.teacher and user_role == RoleEnum.admin:
+        elif user.role == RoleEnum.teacher:
+            if user_role != RoleEnum.admin:
+                raise PermissionError("You cannot reset other teachers' passwords.")
             password = settings.TEACHER_DEFAULT_PASSWORD
-            hashed_password = self.get_password_hash(password)
-        user.hashed_password = hashed_password
-        self.auth_repo.change_password(user, user.hashed_password, first_login=True)
+        else:
+            raise PermissionError("You cannot reset password for admin account.")
+        self.auth_repo.change_password(
+            user, self.get_password_hash(password), first_login=True
+        )
         return user, password
 
     def setup_admin_account(self, password: str) -> Account:
